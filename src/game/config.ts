@@ -1,0 +1,201 @@
+import type { TowerConfig, CardConfig, EnemyConfig, WaveConfig, Position } from './types';
+
+export const TILE_SIZE = 50;
+export const MAP_WIDTH = 16;
+export const MAP_HEIGHT = 10;
+
+export const INITIAL_GOLD = 200;
+export const INITIAL_MANA = 50;
+export const MAX_MANA = 100;
+export const INITIAL_LIVES = 20;
+export const MAX_HAND_SIZE = 5;
+export const MANA_REGEN_RATE = 2;
+
+export const TOWER_CONFIGS: Record<string, TowerConfig> = {
+  arrow: {
+    name: '箭塔',
+    damage: 15,
+    attackSpeed: 0.8,
+    range: 120,
+    cost: 50,
+    color: '#8B4513',
+    projectileColor: '#D2691E',
+    projectileSpeed: 400,
+    icon: '🏹',
+    description: '攻速快，单体攻击',
+  },
+  mage: {
+    name: '法师塔',
+    damage: 35,
+    attackSpeed: 1.5,
+    range: 150,
+    cost: 100,
+    color: '#7c3aed',
+    projectileColor: '#a78bfa',
+    projectileSpeed: 300,
+    splashRadius: 40,
+    icon: '🔮',
+    description: '高伤害，范围攻击',
+  },
+  ice: {
+    name: '冰冻塔',
+    damage: 8,
+    attackSpeed: 1.0,
+    range: 100,
+    cost: 75,
+    color: '#00d9ff',
+    projectileColor: '#7dd3fc',
+    projectileSpeed: 350,
+    slowEffect: 0.5,
+    slowDuration: 2,
+    icon: '❄️',
+    description: '减速敌人移动速度',
+  },
+};
+
+export const CARD_CONFIGS: Record<string, CardConfig> = {
+  fireball: {
+    name: '火球术',
+    description: '对目标区域造成大量伤害',
+    manaCost: 30,
+    icon: '🔥',
+    damage: 80,
+    radius: 60,
+  },
+  freeze: {
+    name: '冰冻术',
+    description: '冻结范围内敌人3秒',
+    manaCost: 25,
+    icon: '🧊',
+    radius: 80,
+    duration: 3,
+  },
+  lightning: {
+    name: '闪电链',
+    description: '连锁攻击3个敌人',
+    manaCost: 35,
+    icon: '⚡',
+    damage: 50,
+  },
+  heal: {
+    name: '治疗术',
+    description: '恢复5点生命值',
+    manaCost: 20,
+    icon: '💚',
+    healAmount: 5,
+  },
+  gold_rain: {
+    name: '金币雨',
+    description: '获得100金币',
+    manaCost: 15,
+    icon: '💰',
+    goldAmount: 100,
+  },
+  tower_boost: {
+    name: '强化塔',
+    description: '所有塔攻击力提升50%，持续10秒',
+    manaCost: 40,
+    icon: '💪',
+    boostMultiplier: 1.5,
+    duration: 10,
+  },
+};
+
+export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
+  normal: {
+    name: '哥布林',
+    health: 60,
+    speed: 50,
+    reward: 10,
+    color: '#22c55e',
+    size: 14,
+  },
+  fast: {
+    name: '飞贼',
+    health: 35,
+    speed: 90,
+    reward: 15,
+    color: '#f59e0b',
+    size: 10,
+  },
+  tank: {
+    name: '巨魔',
+    health: 200,
+    speed: 25,
+    reward: 30,
+    color: '#ef4444',
+    size: 20,
+  },
+  boss: {
+    name: '恶魔领主',
+    health: 800,
+    speed: 20,
+    reward: 150,
+    color: '#7c2d12',
+    size: 28,
+  },
+};
+
+export const WAVE_CONFIGS: WaveConfig[] = [
+  { enemies: [{ type: 'normal', count: 5, interval: 1.5 }] },
+  { enemies: [{ type: 'normal', count: 8, interval: 1.2 }] },
+  { enemies: [{ type: 'normal', count: 5, interval: 1.0 }, { type: 'fast', count: 3, interval: 0.8 }] },
+  { enemies: [{ type: 'fast', count: 8, interval: 0.7 }] },
+  { enemies: [{ type: 'normal', count: 6, interval: 1.0 }, { type: 'tank', count: 2, interval: 2.5 }] },
+  { enemies: [{ type: 'fast', count: 6, interval: 0.6 }, { type: 'tank', count: 3, interval: 2.0 }] },
+  { enemies: [{ type: 'normal', count: 10, interval: 0.8 }, { type: 'fast', count: 5, interval: 0.6 }] },
+  { enemies: [{ type: 'tank', count: 5, interval: 1.8 }] },
+  { enemies: [{ type: 'fast', count: 10, interval: 0.5 }, { type: 'tank', count: 3, interval: 2.0 }] },
+  { enemies: [{ type: 'normal', count: 8, interval: 0.8 }, { type: 'tank', count: 4, interval: 1.5 }, { type: 'boss', count: 1, interval: 5 }] },
+];
+
+export const PATH: Position[] = [
+  { x: -1, y: 4 },
+  { x: 2, y: 4 },
+  { x: 2, y: 1 },
+  { x: 6, y: 1 },
+  { x: 6, y: 7 },
+  { x: 10, y: 7 },
+  { x: 10, y: 3 },
+  { x: 14, y: 3 },
+  { x: 14, y: 6 },
+  { x: 17, y: 6 },
+];
+
+export const BUILDABLE_POSITIONS: Position[] = [
+  { x: 1, y: 3 }, { x: 1, y: 5 },
+  { x: 3, y: 0 }, { x: 3, y: 2 },
+  { x: 4, y: 2 }, { x: 5, y: 2 },
+  { x: 5, y: 0 }, { x: 4, y: 0 },
+  { x: 4, y: 6 }, { x: 5, y: 6 },
+  { x: 7, y: 6 }, { x: 7, y: 8 },
+  { x: 8, y: 8 }, { x: 9, y: 8 },
+  { x: 8, y: 5 }, { x: 9, y: 5 },
+  { x: 9, y: 2 }, { x: 11, y: 2 },
+  { x: 11, y: 4 }, { x: 12, y: 4 },
+  { x: 12, y: 6 }, { x: 13, y: 6 },
+  { x: 13, y: 2 }, { x: 11, y: 8 },
+  { x: 3, y: 7 }, { x: 4, y: 8 },
+];
+
+export function generateRandomDeck(): string[] {
+  const cardTypes = Object.keys(CARD_CONFIGS);
+  const deck: string[] = [];
+  const deckSize = 15;
+
+  for (let i = 0; i < deckSize; i++) {
+    const randomIndex = Math.floor(Math.random() * cardTypes.length);
+    deck.push(cardTypes[randomIndex]);
+  }
+
+  return deck;
+}
+
+export function shuffleDeck<T>(deck: T[]): T[] {
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
