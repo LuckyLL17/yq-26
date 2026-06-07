@@ -14,42 +14,45 @@ export const MANA_REGEN_RATE = 2;
 export const TOWER_CONFIGS: Record<string, TowerConfig> = {
   arrow: {
     name: '箭塔',
-    damage: 15,
-    attackSpeed: 0.8,
-    range: 120,
-    cost: 50,
+    maxLevel: 3,
     color: '#8B4513',
     projectileColor: '#D2691E',
     projectileSpeed: 400,
     icon: '🏹',
     description: '攻速快，单体攻击',
+    levels: [
+      { damage: 15, attackSpeed: 0.8, range: 120, cost: 50 },
+      { damage: 25, attackSpeed: 0.65, range: 140, cost: 75 },
+      { damage: 40, attackSpeed: 0.5, range: 160, cost: 120 },
+    ],
   },
   mage: {
     name: '法师塔',
-    damage: 35,
-    attackSpeed: 1.5,
-    range: 150,
-    cost: 100,
+    maxLevel: 3,
     color: '#7c3aed',
     projectileColor: '#a78bfa',
     projectileSpeed: 300,
-    splashRadius: 40,
     icon: '🔮',
     description: '高伤害，范围攻击',
+    levels: [
+      { damage: 35, attackSpeed: 1.5, range: 150, cost: 100, splashRadius: 40 },
+      { damage: 55, attackSpeed: 1.2, range: 170, cost: 150, splashRadius: 55 },
+      { damage: 85, attackSpeed: 1.0, range: 200, cost: 220, splashRadius: 70 },
+    ],
   },
   ice: {
     name: '冰冻塔',
-    damage: 8,
-    attackSpeed: 1.0,
-    range: 100,
-    cost: 75,
+    maxLevel: 3,
     color: '#00d9ff',
     projectileColor: '#7dd3fc',
     projectileSpeed: 350,
-    slowEffect: 0.5,
-    slowDuration: 2,
     icon: '❄️',
     description: '减速敌人移动速度',
+    levels: [
+      { damage: 8, attackSpeed: 1.0, range: 100, cost: 75, slowEffect: 0.5, slowDuration: 2 },
+      { damage: 14, attackSpeed: 0.85, range: 120, cost: 100, slowEffect: 0.6, slowDuration: 2.5 },
+      { damage: 22, attackSpeed: 0.7, range: 140, cost: 160, slowEffect: 0.7, slowDuration: 3 },
+    ],
   },
 };
 
@@ -198,4 +201,10 @@ export function shuffleDeck<T>(deck: T[]): T[] {
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;
+}
+
+export function getTowerLevelConfig(towerType: string, level: number) {
+  const config = TOWER_CONFIGS[towerType];
+  const levelIndex = Math.min(level - 1, config.levels.length - 1);
+  return config.levels[levelIndex];
 }

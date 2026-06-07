@@ -1,5 +1,5 @@
 import { useGameStore } from '@/game/store';
-import { TOWER_CONFIGS } from '@/game/config';
+import { TOWER_CONFIGS, getTowerLevelConfig } from '@/game/config';
 import type { TowerType } from '@/game/types';
 
 export default function TowerPanel() {
@@ -15,7 +15,8 @@ export default function TowerPanel() {
 
       <div className="space-y-2">
         {towerTypes.map(([type, config]) => {
-          const canAfford = gold >= config.cost;
+          const levelConfig = getTowerLevelConfig(type, 1);
+          const canAfford = gold >= levelConfig.cost;
           const isSelected = selectedTowerType === type;
           const isDisabled = !canAfford || status !== 'playing';
 
@@ -44,14 +45,14 @@ export default function TowerPanel() {
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white">{config.name}</span>
                     <span className={`text-sm font-bold ${canAfford ? 'text-yellow-400' : 'text-red-400'}`}>
-                      💰 {config.cost}
+                      💰 {levelConfig.cost}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">{config.description}</p>
                   <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                    <span>⚔️ {config.damage}</span>
-                    <span>⏱️ {config.attackSpeed}s</span>
-                    <span>📏 {config.range}</span>
+                    <span>⚔️ {levelConfig.damage}</span>
+                    <span>⏱️ {levelConfig.attackSpeed}s</span>
+                    <span>📏 {levelConfig.range}</span>
                   </div>
                 </div>
               </div>

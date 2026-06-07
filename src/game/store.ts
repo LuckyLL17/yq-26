@@ -28,6 +28,7 @@ import {
   TILE_SIZE,
   generateRandomDeck,
   shuffleDeck,
+  getTowerLevelConfig,
 } from './config';
 
 let idCounter = 0;
@@ -68,6 +69,7 @@ function createInitialState(): GameState {
     hand,
     discardPile: [],
     selectedTowerType: null,
+    selectedTowerId: null,
     selectedCard: null,
     score: 0,
     waveInProgress: false,
@@ -161,7 +163,10 @@ interface GameStore extends GameState {
   resumeGame: () => void;
   restartGame: () => void;
   selectTowerType: (type: TowerType | null) => void;
+  selectTower: (towerId: string | null) => void;
   buildTower: (gridPosition: Position) => void;
+  upgradeTower: (towerId: string) => void;
+  sellTower: (towerId: string) => void;
   selectCard: (card: Card | null) => void;
   playCard: (targetPosition?: Position) => void;
   drawCards: (count: number) => void;
@@ -195,18 +200,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   selectTowerType: (type) => {
-    set({ selectedTowerType: type, selectedCard: null });
+    set({ selectedTowerType: type, selectedCard: null, selectedTowerId: null });
+  },
+
+  selectTower: (towerId) => {
+    set({ selectedTowerId: towerId, selectedTowerType: null, selectedCard: null });
   },
 
   buildTower: (gridPosition) => {
     const state = get();
-    const { selectedTowerType, gold, towers } = state;
+    const { selectedTowerType, gold, towers, effects } = state;
 
     if (!selectedTowerType) return;
     if (!isBuildable(gridPosition, towers)) return;
 
     const config = TOWER_CONFIGS[selectedTowerType];
-    if (gold < config.cost) return;
+    const levelConfig = config.levels[0];
+    if (gold < levelConfig.cost) return;
 
     const newTower: Tower = {
       id: generateId(),
@@ -231,16 +241,89 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({
       towers: [...towers, newTower],
-      gold: gold - config.cost,
+      gold: gold - levelConfig.cost,
       selectedTowerType: null,
-      effects: [...state.effects, newEffect],
+      effects: [...effects, newEffect],
+    });
+  },
+
+  upgradeTower: (towerId) => {
+    const state = get();
+    const { towers, gold, effects } = state;
+
+    const tower = towers.find((t) => t.id === towerId);
+    if (!tower) return;
+
+    const config = TOWER_CONFIGS[tower.type];
+    if (tower.level >= config.maxLevel) return;
+
+    const nextLevelConfig = config.levels[tower.level];
+    if (gold < nextLevelConfig.cost) return;
+
+    const upgradedTowers = towers.map((t) =>
+      t.id === towerId ? { ...t, level: t.level + 1 } : t
+    );
+
+    const towerPos = {
+      x: tower.position.x * TILE_SIZE + TILE_SIZE / 2,
+      y: tower.position.y * TILE_SIZE + TILE_SIZE / 2,
+    };
+
+    const newEffects: Effect[] = [
+      ...effects,
+      {
+        id: generateId(),
+        type: 'upgrade',
+        position: towerPos,
+        duration: 0.8,
+        maxDuration: 0.8,
+        radius: TILE_SIZE * 1.5,
+        towerId,
+      },
+      {
+        id: generateId(),
+        type: 'level_up',
+        position: towerPos,
+        duration: 1.2,
+        maxDuration: 1.2,
+        towerId,
+      },
+    ];
+
+    set({
+      towers: upgradedTowers,
+      gold: gold - nextLevelConfig.cost,
+      effects: newEffects,
+    });
+  },
+
+  sellTower: (towerId) => {
+    const state = get();
+    const { towers, gold } = state;
+
+    const tower = towers.find((t) => t.id === towerId);
+    if (!tower) return;
+
+    const config = TOWER_CONFIGS[tower.type];
+    let totalCost = 0;
+    for (let i = 0; i < tower.level; i++) {
+      totalCost += config.levels[i].cost;
+    }
+    const sellValue = Math.floor(totalCost * 0.7);
+
+    const remainingTowers = towers.filter((t) => t.id !== towerId);
+
+    set({
+      towers: remainingTowers,
+      gold: gold + sellValue,
+      selectedTowerId: null,
     });
   },
 
   selectCard: (card) => {
     const { selectedCard, mana } = get();
     if (card && card.manaCost > mana) return;
-    set({ selectedCard: selectedCard?.id === card?.id ? null : card, selectedTowerType: null });
+    set({ selectedCard: selectedCard?.id === card?.id ? null : card, selectedTowerType: null, selectedTowerId: null });
   },
 
   playCard: (targetPosition) => {
@@ -527,9 +610,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       newTowers.forEach((tower) => {
         const towerConfig = TOWER_CONFIGS[tower.type];
+        const levelConfig = getTowerLevelConfig(tower.type, tower.level);
         const towerPos = getTowerWorldPosition(tower);
 
-        if (newGameTime - tower.lastAttackTime < towerConfig.attackSpeed) return;
+        if (newGameTime - tower.lastAttackTime < levelConfig.attackSpeed) return;
 
         let nearestEnemy: Enemy | null = null;
         let nearestDist = Infinity;
@@ -537,7 +621,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         newEnemies.forEach((enemy) => {
           const enemyPos = getEnemyWorldPosition(enemy);
           const dist = getDistance(towerPos, enemyPos);
-          if (dist <= towerConfig.range && dist < nearestDist) {
+          if (dist <= levelConfig.range && dist < nearestDist) {
             nearestDist = dist;
             nearestEnemy = enemy;
           }
@@ -554,11 +638,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             position: { ...towerPos },
             targetId: nearestEnemy.id,
             speed: towerConfig.projectileSpeed,
-            damage: towerConfig.damage * newTowerBoostMultiplier,
+            damage: levelConfig.damage * newTowerBoostMultiplier,
             type: tower.type,
-            splashRadius: towerConfig.splashRadius,
-            slowEffect: towerConfig.slowEffect,
-            slowDuration: towerConfig.slowDuration,
+            splashRadius: levelConfig.splashRadius,
+            slowEffect: levelConfig.slowEffect,
+            slowDuration: levelConfig.slowDuration,
           };
           newProjectiles.push(projectile);
         }

@@ -1,6 +1,7 @@
 import GameCanvas from '@/components/GameCanvas';
 import StatusBar from '@/components/StatusBar';
 import TowerPanel from '@/components/TowerPanel';
+import TowerUpgradePanel from '@/components/TowerUpgradePanel';
 import CardHand from '@/components/CardHand';
 import GameControls from '@/components/GameControls';
 import StartScreen from '@/components/StartScreen';
@@ -8,7 +9,7 @@ import GameOverModal from '@/components/GameOverModal';
 import { useGameStore } from '@/game/store';
 
 export default function Home() {
-  const { status } = useGameStore();
+  const { status, selectedTowerId } = useGameStore();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-game-bg via-game-panel to-game-bg">
@@ -28,8 +29,9 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-4">
-            <div className="lg:w-64 flex-shrink-0 order-2 lg:order-1">
+            <div className="lg:w-64 flex-shrink-0 order-2 lg:order-1 space-y-4">
               <TowerPanel />
+              {selectedTowerId && <TowerUpgradePanel />}
             </div>
 
             <div className="flex-1 order-1 lg:order-2 flex justify-center">
@@ -46,7 +48,7 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-4 text-gray-600 text-sm">
-            <p>💡 提示：建造防御塔阻击敌人，使用卡牌释放强力技能！</p>
+            <p>💡 提示：建造防御塔阻击敌人，点击已建造的塔可以升级！</p>
           </div>
         </div>
       )}

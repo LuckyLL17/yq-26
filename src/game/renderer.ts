@@ -1,5 +1,5 @@
 import type { Tower, Enemy, Projectile, Effect, Position } from './types';
-import { TOWER_CONFIGS, ENEMY_CONFIGS, CARD_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './config';
+import { TOWER_CONFIGS, ENEMY_CONFIGS, CARD_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, getTowerLevelConfig } from './config';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -72,6 +72,7 @@ export class GameRenderer {
     projectiles: Projectile[],
     effects: Effect[],
     selectedTowerType: string | null,
+    selectedTowerId: string | null,
     selectedCardType: string | null,
     mousePosition: Position | null,
     deltaTime: number
@@ -80,11 +81,13 @@ export class GameRenderer {
     this.drawBackground();
     this.drawPath();
     this.drawBuildablePositions(towers, selectedTowerType);
-    this.drawTowers(towers);
+    this.drawTowers(towers, selectedTowerId);
+    this.drawSelectedTowerRange(towers, selectedTowerId);
     this.drawEnemies(enemies);
     this.drawProjectiles(projectiles);
     this.drawEffects(effects);
     this.drawParticles();
+    this.drawLevelUpTexts(effects);
     this.drawSelectionIndicator(selectedTowerType, selectedCardType, mousePosition, towers);
   }
 
@@ -201,13 +204,24 @@ export class GameRenderer {
     });
   }
 
-  private drawTowers(towers: Tower[]) {
+  private drawTowers(towers: Tower[], selectedTowerId: string | null) {
     const ctx = this.ctx;
 
     towers.forEach((tower) => {
       const config = TOWER_CONFIGS[tower.type];
+      const isSelected = tower.id === selectedTowerId;
       const x = tower.position.x * TILE_SIZE + TILE_SIZE / 2;
       const y = tower.position.y * TILE_SIZE + TILE_SIZE / 2;
+
+      if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(x, y, TILE_SIZE * 0.45, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
       ctx.beginPath();
       ctx.arc(x, y, TILE_SIZE * 0.35, 0, Math.PI * 2);
@@ -243,7 +257,46 @@ export class GameRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(config.icon, x, y + 1);
+
+      const starSize = 8;
+      const starSpacing = 4;
+      const totalStars = tower.level;
+      const starsWidth = totalStars * starSize + (totalStars - 1) * starSpacing;
+      const starStartX = x - starsWidth / 2 + starSize / 2;
+
+      for (let i = 0; i < totalStars; i++) {
+        const starX = starStartX + i * (starSize + starSpacing);
+        const starY = y - TILE_SIZE * 0.35 - 6;
+
+        ctx.font = `${starSize + 4}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('★', starX, starY);
+      }
     });
+  }
+
+  private drawSelectedTowerRange(towers: Tower[], selectedTowerId: string | null) {
+    if (!selectedTowerId) return;
+
+    const tower = towers.find((t) => t.id === selectedTowerId);
+    if (!tower) return;
+
+    const ctx = this.ctx;
+    const levelConfig = getTowerLevelConfig(tower.type, tower.level);
+    const x = tower.position.x * TILE_SIZE + TILE_SIZE / 2;
+    const y = tower.position.y * TILE_SIZE + TILE_SIZE / 2;
+
+    ctx.beginPath();
+    ctx.arc(x, y, levelConfig.range, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   private drawEnemies(enemies: Enemy[]) {
@@ -440,7 +493,48 @@ export class GameRenderer {
           ctx.stroke();
           break;
         }
+        case 'upgrade': {
+          const radius = (effect.radius || 40) * (0.5 + progress * 1);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius * 0.7, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 165, 0, ${alpha * 0.7})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        }
       }
+    });
+  }
+
+  private drawLevelUpTexts(effects: Effect[]) {
+    const ctx = this.ctx;
+
+    effects.forEach((effect) => {
+      if (effect.type !== 'level_up') return;
+
+      const progress = 1 - effect.duration / effect.maxDuration;
+      const alpha = 1 - progress * 0.8;
+      const offsetY = -30 - progress * 50;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      ctx.fillStyle = '#ffd700';
+      ctx.shadowColor = '#ff8c00';
+      ctx.shadowBlur = 10;
+      ctx.fillText('⬆ 升级!', effect.position.x, effect.position.y + offsetY);
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
     });
   }
 
@@ -470,6 +564,7 @@ export class GameRenderer {
 
     if (selectedTowerType) {
       const config = TOWER_CONFIGS[selectedTowerType];
+      const levelConfig = getTowerLevelConfig(selectedTowerType, 1);
       const canBuild = BUILDABLE_POSITIONS.some((p) => p.x === gridX && p.y === gridY) &&
         !towers.some((t) => t.position.x === gridX && t.position.y === gridY);
 
@@ -482,7 +577,7 @@ export class GameRenderer {
         ctx.arc(
           gridX * TILE_SIZE + TILE_SIZE / 2,
           gridY * TILE_SIZE + TILE_SIZE / 2,
-          config.range,
+          levelConfig.range,
           0,
           Math.PI * 2
         );

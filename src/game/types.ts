@@ -57,31 +57,37 @@ export interface Card {
 
 export interface Effect {
   id: string;
-  type: 'explosion' | 'freeze' | 'lightning' | 'heal' | 'gold' | 'tower_boost' | 'build';
+  type: 'explosion' | 'freeze' | 'lightning' | 'heal' | 'gold' | 'tower_boost' | 'build' | 'upgrade' | 'level_up';
   position: Position;
   duration: number;
   maxDuration: number;
   radius?: number;
+  towerId?: string;
 }
 
 export interface WaveConfig {
   enemies: { type: EnemyType; count: number; interval: number }[];
 }
 
-export interface TowerConfig {
-  name: string;
+export interface TowerLevelConfig {
   damage: number;
   attackSpeed: number;
   range: number;
   cost: number;
-  color: string;
-  projectileColor: string;
-  projectileSpeed: number;
   splashRadius?: number;
   slowEffect?: number;
   slowDuration?: number;
+}
+
+export interface TowerConfig {
+  name: string;
+  levels: TowerLevelConfig[];
+  color: string;
+  projectileColor: string;
+  projectileSpeed: number;
   icon: string;
   description: string;
+  maxLevel: number;
 }
 
 export interface CardConfig {
@@ -122,6 +128,7 @@ export interface GameState {
   hand: Card[];
   discardPile: Card[];
   selectedTowerType: TowerType | null;
+  selectedTowerId: string | null;
   selectedCard: Card | null;
   score: number;
   waveInProgress: boolean;

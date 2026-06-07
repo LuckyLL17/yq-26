@@ -22,8 +22,10 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
     projectiles,
     effects,
     selectedTowerType,
+    selectedTowerId,
     selectedCard,
     buildTower,
+    selectTower,
     playCard,
     tick,
   } = useGameStore();
@@ -70,6 +72,7 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
       currentState.projectiles,
       currentState.effects,
       currentState.selectedTowerType,
+      currentState.selectedTowerId,
       currentState.selectedCard?.type || null,
       mousePosition,
       clampedDelta
@@ -121,6 +124,23 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
       buildTower({ x: gridX, y: gridY });
     } else if (selectedCard) {
       playCard({ x, y });
+    } else {
+      const clickedTower = towers.find((tower) => {
+        const towerX = tower.position.x * TILE_SIZE + TILE_SIZE / 2;
+        const towerY = tower.position.y * TILE_SIZE + TILE_SIZE / 2;
+        const dist = Math.sqrt((x - towerX) ** 2 + (y - towerY) ** 2);
+        return dist <= TILE_SIZE * 0.4;
+      });
+
+      if (clickedTower) {
+        if (selectedTowerId === clickedTower.id) {
+          selectTower(null);
+        } else {
+          selectTower(clickedTower.id);
+        }
+      } else {
+        selectTower(null);
+      }
     }
   };
 
