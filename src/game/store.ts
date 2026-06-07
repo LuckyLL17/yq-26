@@ -73,10 +73,11 @@ function createInitialState(): GameState {
     waveInProgress: false,
     enemiesSpawned: 0,
     totalEnemiesInWave: 0,
-    lastSpawnTime: 0,
+    waveTime: 0,
     spawnQueue: [],
     towerBoostMultiplier: 1,
     towerBoostDuration: 0,
+    gameTime: 0,
   };
 }
 
@@ -431,7 +432,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       spawnQueue,
       enemiesSpawned: 0,
       totalEnemiesInWave: totalEnemies,
-      lastSpawnTime: 0,
+      waveTime: 0,
     });
 
     get().drawCards(2);
@@ -439,9 +440,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   tick: (deltaTime) => {
     const state = get();
-    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, lastSpawnTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier } = state;
+    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, gameTime } = state;
 
     if (status !== 'playing') return;
+
+    const newGameTime = gameTime + deltaTime;
+    let newWaveTime = waveTime;
 
     let newMana = Math.min(maxMana, mana + MANA_REGEN_RATE * deltaTime);
     let newLives = lives;
@@ -466,42 +470,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     let remainingQueue = [...spawnQueue];
     let spawnedCount = enemiesSpawned;
-    let newLastSpawnTime = lastSpawnTime;
-
-    if (waveInProgress && spawnQueue.length > 0) {
-      newLastSpawnTime = lastSpawnTime + deltaTime;
-
-      const newQueue: typeof spawnQueue = [];
-      spawnQueue.forEach((spawn) => {
-        if (spawn.spawnTime <= newLastSpawnTime) {
-          const config = ENEMY_CONFIGS[spawn.type];
-          const startPos = PATH[0];
-          const newEnemy: Enemy = {
-            id: generateId(),
-            type: spawn.type,
-            position: {
-              x: startPos.x * TILE_SIZE + TILE_SIZE / 2,
-              y: startPos.y * TILE_SIZE + TILE_SIZE / 2,
-            },
-            health: config.health,
-            maxHealth: config.health,
-            speed: config.speed,
-            pathIndex: 0,
-            slowEffect: 0,
-            slowDuration: 0,
-            freezeDuration: 0,
-            reward: config.reward,
-          };
-          newEnemies.push(newEnemy);
-          spawnedCount++;
-        } else {
-          newQueue.push({ ...spawn, spawnTime: spawn.spawnTime - newLastSpawnTime });
-        }
-      });
-      remainingQueue = newQueue;
-    }
 
     if (waveInProgress) {
+      newWaveTime = waveTime + deltaTime;
+
+      if (spawnQueue.length > 0) {
+        const newQueue: typeof spawnQueue = [];
+        spawnQueue.forEach((spawn) => {
+          if (spawn.spawnTime <= newWaveTime) {
+            const config = ENEMY_CONFIGS[spawn.type];
+            const startPos = PATH[0];
+            const newEnemy: Enemy = {
+              id: generateId(),
+              type: spawn.type,
+              position: {
+                x: startPos.x * TILE_SIZE + TILE_SIZE / 2,
+                y: startPos.y * TILE_SIZE + TILE_SIZE / 2,
+              },
+              health: config.health,
+              maxHealth: config.health,
+              speed: config.speed,
+              pathIndex: 0,
+              slowEffect: 0,
+              slowDuration: 0,
+              freezeDuration: 0,
+              reward: config.reward,
+            };
+            newEnemies.push(newEnemy);
+            spawnedCount++;
+          } else {
+            newQueue.push(spawn);
+          }
+        });
+        remainingQueue = newQueue;
+      }
+
       const reachedEnd: string[] = [];
       newEnemies.forEach((enemy) => {
         const reached = moveEnemyAlongPath(enemy, deltaTime);
@@ -526,7 +529,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const towerConfig = TOWER_CONFIGS[tower.type];
         const towerPos = getTowerWorldPosition(tower);
 
-        if (tower.lastAttackTime + towerConfig.attackSpeed > lastSpawnTime + deltaTime) return;
+        if (newGameTime - tower.lastAttackTime < towerConfig.attackSpeed) return;
 
         let nearestEnemy: Enemy | null = null;
         let nearestDist = Infinity;
@@ -544,7 +547,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           const enemyPos = getEnemyWorldPosition(nearestEnemy);
           const angle = Math.atan2(enemyPos.y - towerPos.y, enemyPos.x - towerPos.x);
           tower.angle = angle;
-          tower.lastAttackTime = lastSpawnTime + deltaTime;
+          tower.lastAttackTime = newGameTime;
 
           const projectile: Projectile = {
             id: generateId(),
@@ -623,13 +626,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
         lives: newLives,
         gold: newGold,
         score: newScore,
-        lastSpawnTime: newLastSpawnTime,
+        waveTime: newWaveTime,
         spawnQueue: remainingQueue,
         enemiesSpawned: spawnedCount,
         waveInProgress: !waveComplete,
         status: newStatus,
         towerBoostDuration: newTowerBoostDuration,
         towerBoostMultiplier: newTowerBoostMultiplier,
+        gameTime: newGameTime,
       });
     } else {
       newEffects = newEffects
@@ -644,6 +648,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         score: newScore,
         towerBoostDuration: newTowerBoostDuration,
         towerBoostMultiplier: newTowerBoostMultiplier,
+        gameTime: newGameTime,
       });
     }
   },

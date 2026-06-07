@@ -1,5 +1,5 @@
 import type { Tower, Enemy, Projectile, Effect, Position } from './types';
-import { TOWER_CONFIGS, ENEMY_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './config';
+import { TOWER_CONFIGS, ENEMY_CONFIGS, CARD_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from './config';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -72,7 +72,7 @@ export class GameRenderer {
     projectiles: Projectile[],
     effects: Effect[],
     selectedTowerType: string | null,
-    selectedCard: boolean,
+    selectedCardType: string | null,
     mousePosition: Position | null,
     deltaTime: number
   ) {
@@ -85,7 +85,7 @@ export class GameRenderer {
     this.drawProjectiles(projectiles);
     this.drawEffects(effects);
     this.drawParticles();
-    this.drawSelectionIndicator(selectedTowerType, selectedCard, mousePosition, towers);
+    this.drawSelectionIndicator(selectedTowerType, selectedCardType, mousePosition, towers);
   }
 
   private drawBackground() {
@@ -458,7 +458,7 @@ export class GameRenderer {
 
   private drawSelectionIndicator(
     selectedTowerType: string | null,
-    selectedCard: boolean,
+    selectedCardType: string | null,
     mousePosition: Position | null,
     towers: Tower[]
   ) {
@@ -494,12 +494,26 @@ export class GameRenderer {
       }
     }
 
-    if (selectedCard) {
+    if (selectedCardType) {
+      const cardConfig = CARD_CONFIGS[selectedCardType];
+      const radius = cardConfig.radius || 60;
+
+      let fillColor = 'rgba(255, 100, 50, 0.2)';
+      let strokeColor = 'rgba(255, 100, 50, 0.6)';
+
+      if (selectedCardType === 'freeze') {
+        fillColor = 'rgba(0, 217, 255, 0.2)';
+        strokeColor = 'rgba(0, 217, 255, 0.6)';
+      } else if (selectedCardType === 'fireball') {
+        fillColor = 'rgba(255, 100, 50, 0.2)';
+        strokeColor = 'rgba(255, 100, 50, 0.6)';
+      }
+
       ctx.beginPath();
-      ctx.arc(mousePosition.x, mousePosition.y, 60, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 100, 50, 0.2)';
+      ctx.arc(mousePosition.x, mousePosition.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = fillColor;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 100, 50, 0.6)';
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
       ctx.stroke();

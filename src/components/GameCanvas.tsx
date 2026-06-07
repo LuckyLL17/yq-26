@@ -70,7 +70,7 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
       currentState.projectiles,
       currentState.effects,
       currentState.selectedTowerType,
-      !!currentState.selectedCard,
+      currentState.selectedCard?.type || null,
       mousePosition,
       clampedDelta
     );

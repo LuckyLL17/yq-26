@@ -127,10 +127,11 @@ export interface GameState {
   waveInProgress: boolean;
   enemiesSpawned: number;
   totalEnemiesInWave: number;
-  lastSpawnTime: number;
+  waveTime: number;
   spawnQueue: { type: EnemyType; spawnTime: number }[];
   towerBoostMultiplier: number;
   towerBoostDuration: number;
+  gameTime: number;
 }
 
 export type GameAction =
