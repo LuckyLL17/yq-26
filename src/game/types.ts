@@ -139,6 +139,27 @@ export interface GameState {
   towerBoostMultiplier: number;
   towerBoostDuration: number;
   gameTime: number;
+  battleLogs: BattleLogEntry[];
+}
+
+export type BattleLogType =
+  | 'build'
+  | 'upgrade'
+  | 'sell'
+  | 'kill'
+  | 'damage'
+  | 'wave'
+  | 'card'
+  | 'heal'
+  | 'gold'
+  | 'warning'
+  | 'info';
+
+export interface BattleLogEntry {
+  id: string;
+  type: BattleLogType;
+  message: string;
+  timestamp: number;
 }
 
 export type GameAction =

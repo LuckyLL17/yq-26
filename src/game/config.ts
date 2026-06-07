@@ -10,6 +10,7 @@ export const MAX_MANA = 100;
 export const INITIAL_LIVES = 20;
 export const MAX_HAND_SIZE = 5;
 export const MANA_REGEN_RATE = 2;
+export const MAX_BATTLE_LOGS = 50;
 
 export const TOWER_CONFIGS: Record<string, TowerConfig> = {
   arrow: {

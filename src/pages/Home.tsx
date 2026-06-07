@@ -6,6 +6,7 @@ import CardHand from '@/components/CardHand';
 import GameControls from '@/components/GameControls';
 import StartScreen from '@/components/StartScreen';
 import GameOverModal from '@/components/GameOverModal';
+import BattleLog from '@/components/BattleLog';
 import { useGameStore } from '@/game/store';
 
 export default function Home() {
@@ -38,8 +39,9 @@ export default function Home() {
               <GameCanvas />
             </div>
 
-            <div className="lg:w-64 flex-shrink-0 order-3">
+            <div className="lg:w-64 flex-shrink-0 order-3 space-y-4">
               <GameControls />
+              <BattleLog />
             </div>
           </div>
 

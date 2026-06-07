@@ -11,6 +11,8 @@ import type {
   TowerType,
   CardType,
   EnemyType,
+  BattleLogType,
+  BattleLogEntry,
 } from './types';
 import {
   TOWER_CONFIGS,
@@ -26,6 +28,7 @@ import {
   MAX_HAND_SIZE,
   MANA_REGEN_RATE,
   TILE_SIZE,
+  MAX_BATTLE_LOGS,
   generateRandomDeck,
   shuffleDeck,
   getTowerLevelConfig,
@@ -80,6 +83,7 @@ function createInitialState(): GameState {
     towerBoostMultiplier: 1,
     towerBoostDuration: 0,
     gameTime: 0,
+    battleLogs: [],
   };
 }
 
@@ -172,6 +176,7 @@ interface GameStore extends GameState {
   drawCards: (count: number) => void;
   startWave: () => void;
   tick: (deltaTime: number) => void;
+  addBattleLog: (type: BattleLogType, message: string) => void;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -245,6 +250,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedTowerType: null,
       effects: [...effects, newEffect],
     });
+
+    get().addBattleLog('build', `建造了 ${config.name}（花费 ${levelConfig.cost} 金币）`);
   },
 
   upgradeTower: (towerId) => {
@@ -295,6 +302,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gold: gold - nextLevelConfig.cost,
       effects: newEffects,
     });
+
+    get().addBattleLog('upgrade', `${config.name} 升级到 ${tower.level + 1} 级（花费 ${nextLevelConfig.cost} 金币）`);
   },
 
   sellTower: (towerId) => {
@@ -318,6 +327,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gold: gold + sellValue,
       selectedTowerId: null,
     });
+
+    get().addBattleLog('sell', `出售了 ${config.name}（获得 ${sellValue} 金币）`);
   },
 
   selectCard: (card) => {
@@ -463,6 +474,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       towerBoostMultiplier: newTowerBoostMultiplier,
       towerBoostDuration: newTowerBoostDuration,
     });
+
+    get().addBattleLog('card', `使用了 ${selectedCard.name}`);
   },
 
   drawCards: (count) => {
@@ -519,6 +532,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     get().drawCards(2);
+    get().addBattleLog('wave', `第 ${wave + 1} 波敌人来袭！`);
   },
 
   tick: (deltaTime) => {
@@ -597,6 +611,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       });
 
+      if (reachedEnd.length > 0) {
+        get().addBattleLog('warning', `${reachedEnd.length} 个敌人突破了防线！`);
+      }
+
       newEnemies = newEnemies.filter((e) => !reachedEnd.includes(e.id));
 
       const deadEnemies = newEnemies.filter((e) => e.health <= 0);
@@ -604,6 +622,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         newGold += e.reward;
         newScore += e.reward * 10;
       });
+
+      if (deadEnemies.length > 0) {
+        const totalReward = deadEnemies.reduce((sum, e) => sum + e.reward, 0);
+        get().addBattleLog('kill', `消灭了 ${deadEnemies.length} 个敌人（获得 ${totalReward} 金币）`);
+      }
+
       newEnemies = newEnemies.filter((e) => e.health > 0);
 
       const waveComplete = remainingQueue.length === 0 && newEnemies.length === 0;
@@ -693,8 +717,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       let newStatus: GameStatus = status;
       if (newLives <= 0) {
         newStatus = 'lost';
+        get().addBattleLog('warning', '游戏失败！生命值耗尽...');
       } else if (waveComplete && wave >= maxWaves) {
         newStatus = 'won';
+        get().addBattleLog('info', '🎉 恭喜通关！所有波次已清除！');
+      } else if (waveComplete) {
+        get().addBattleLog('info', `第 ${wave} 波完成！`);
       }
 
       newEffects = newEffects
@@ -735,5 +763,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
         gameTime: newGameTime,
       });
     }
+  },
+
+  addBattleLog: (type, message) => {
+    const { battleLogs, gameTime } = get();
+    const newLog: BattleLogEntry = {
+      id: generateId(),
+      type,
+      message,
+      timestamp: gameTime,
+    };
+    const newLogs = [newLog, ...battleLogs].slice(0, MAX_BATTLE_LOGS);
+    set({ battleLogs: newLogs });
   },
 }));
