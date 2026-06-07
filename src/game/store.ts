@@ -99,8 +99,8 @@ function getDistance(a: Position, b: Position): number {
 
 function getEnemyWorldPosition(enemy: Enemy): Position {
   return {
-    x: enemy.position.x * TILE_SIZE + TILE_SIZE / 2,
-    y: enemy.position.y * TILE_SIZE + TILE_SIZE / 2,
+    x: enemy.position.x,
+    y: enemy.position.y,
   };
 }
 
@@ -464,11 +464,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    if (waveInProgress && spawnQueue.length > 0) {
-      const newLastSpawnTime = lastSpawnTime + deltaTime;
-      const remainingQueue: typeof spawnQueue = [];
-      let spawnedCount = enemiesSpawned;
+    let remainingQueue = [...spawnQueue];
+    let spawnedCount = enemiesSpawned;
+    let newLastSpawnTime = lastSpawnTime;
 
+    if (waveInProgress && spawnQueue.length > 0) {
+      newLastSpawnTime = lastSpawnTime + deltaTime;
+
+      const newQueue: typeof spawnQueue = [];
       spawnQueue.forEach((spawn) => {
         if (spawn.spawnTime <= newLastSpawnTime) {
           const config = ENEMY_CONFIGS[spawn.type];
@@ -492,10 +495,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
           newEnemies.push(newEnemy);
           spawnedCount++;
         } else {
-          remainingQueue.push({ ...spawn, spawnTime: spawn.spawnTime - newLastSpawnTime });
+          newQueue.push({ ...spawn, spawnTime: spawn.spawnTime - newLastSpawnTime });
         }
       });
+      remainingQueue = newQueue;
+    }
 
+    if (waveInProgress) {
       const reachedEnd: string[] = [];
       newEnemies.forEach((enemy) => {
         const reached = moveEnemyAlongPath(enemy, deltaTime);
@@ -520,7 +526,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const towerConfig = TOWER_CONFIGS[tower.type];
         const towerPos = getTowerWorldPosition(tower);
 
-        if (tower.lastAttackTime + towerConfig.attackSpeed > newLastSpawnTime) return;
+        if (tower.lastAttackTime + towerConfig.attackSpeed > lastSpawnTime + deltaTime) return;
 
         let nearestEnemy: Enemy | null = null;
         let nearestDist = Infinity;
@@ -538,7 +544,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           const enemyPos = getEnemyWorldPosition(nearestEnemy);
           const angle = Math.atan2(enemyPos.y - towerPos.y, enemyPos.x - towerPos.x);
           tower.angle = angle;
-          tower.lastAttackTime = newLastSpawnTime;
+          tower.lastAttackTime = lastSpawnTime + deltaTime;
 
           const projectile: Projectile = {
             id: generateId(),
@@ -597,16 +603,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       newProjectiles = newProjectiles.filter((p) => !projectilesToRemove.includes(p.id));
 
-      newEffects = newEffects
-        .map((e) => ({ ...e, duration: e.duration - deltaTime }))
-        .filter((e) => e.duration > 0);
-
       let newStatus: GameStatus = status;
       if (newLives <= 0) {
         newStatus = 'lost';
       } else if (waveComplete && wave >= maxWaves) {
         newStatus = 'won';
       }
+
+      newEffects = newEffects
+        .map((e) => ({ ...e, duration: e.duration - deltaTime }))
+        .filter((e) => e.duration > 0);
 
       set({
         enemies: newEnemies,
@@ -626,6 +632,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         towerBoostMultiplier: newTowerBoostMultiplier,
       });
     } else {
+      newEffects = newEffects
+        .map((e) => ({ ...e, duration: e.duration - deltaTime }))
+        .filter((e) => e.duration > 0);
+
       set({
         effects: newEffects,
         mana: newMana,
