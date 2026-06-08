@@ -1,10 +1,14 @@
 import { useGameStore } from '@/game/store';
-import { Play, Sparkles } from 'lucide-react';
+import { Play, Sparkles, Edit3, Map } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import LevelSelect from './LevelSelect';
+import { useNavigate } from 'react-router-dom';
 
 export default function StartScreen() {
   const { startGame, status } = useGameStore();
   const [particles, setParticles] = useState<{ x: number; y: number; delay: number }[]>([]);
+  const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const newParticles = Array.from({ length: 20 }, () => ({
@@ -16,6 +20,10 @@ export default function StartScreen() {
   }, []);
 
   if (status !== 'idle') return null;
+
+  const handleOpenEditor = () => {
+    navigate('/editor');
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-game-bg via-game-panel to-game-bg overflow-hidden">
@@ -86,6 +94,23 @@ export default function StartScreen() {
           <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
 
+        <div className="flex justify-center gap-4 mt-6">
+          <button
+            onClick={() => setShowLevelSelect(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-game-panel/80 hover:bg-game-panel border border-game-magic/30 hover:border-game-magic/50 rounded-full transition-all text-white"
+          >
+            <Map className="w-5 h-5 text-game-gold" />
+            选择关卡
+          </button>
+          <button
+            onClick={handleOpenEditor}
+            className="flex items-center gap-2 px-6 py-3 bg-game-panel/80 hover:bg-game-panel border border-game-magic/30 hover:border-game-magic/50 rounded-full transition-all text-white"
+          >
+            <Edit3 className="w-5 h-5 text-purple-400" />
+            关卡编辑器
+          </button>
+        </div>
+
         <div className="mt-10 text-sm text-gray-500 max-w-lg mx-auto">
           <p className="mb-2">🎮 游戏玩法</p>
           <p>
@@ -94,6 +119,13 @@ export default function StartScreen() {
           </p>
         </div>
       </div>
+
+      {showLevelSelect && (
+        <LevelSelect
+          onClose={() => setShowLevelSelect(false)}
+          onOpenEditor={handleOpenEditor}
+        />
+      )}
     </div>
   );
 }

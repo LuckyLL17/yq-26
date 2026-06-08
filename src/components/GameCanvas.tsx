@@ -66,6 +66,9 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
     }
 
     const currentState = useGameStore.getState();
+    const path = currentState.getPath();
+    const buildablePositions = currentState.getBuildablePositions();
+    
     renderer.render(
       currentState.towers,
       currentState.enemies,
@@ -75,7 +78,9 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
       currentState.selectedTowerId,
       currentState.selectedCard?.type || null,
       mousePosition,
-      clampedDelta
+      clampedDelta,
+      path,
+      buildablePositions
     );
 
     animationFrameRef.current = requestAnimationFrame(gameLoop);

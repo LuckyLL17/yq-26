@@ -13,6 +13,7 @@ import type {
   EnemyType,
   BattleLogType,
   BattleLogEntry,
+  LevelData,
 } from './types';
 import {
   TOWER_CONFIGS,
@@ -33,11 +34,12 @@ import {
   shuffleDeck,
   getTowerLevelConfig,
 } from './config';
+import { getDefaultLevel } from './levelEditor';
 
 let idCounter = 0;
 const generateId = () => `id_${++idCounter}`;
 
-function createInitialState(): GameState {
+function createInitialState(level?: LevelData): GameState {
   idCounter = 0;
   const deckCardTypes = generateRandomDeck();
   const deck: Card[] = shuffleDeck(
@@ -56,14 +58,16 @@ function createInitialState(): GameState {
     hand.push(deck.pop()!);
   }
 
+  const currentLevel = level || getDefaultLevel();
+
   return {
     status: 'idle',
-    gold: INITIAL_GOLD,
+    gold: currentLevel.initialGold,
     mana: INITIAL_MANA,
     maxMana: MAX_MANA,
-    lives: INITIAL_LIVES,
+    lives: currentLevel.initialLives,
     wave: 0,
-    maxWaves: WAVE_CONFIGS.length,
+    maxWaves: currentLevel.waves.length,
     towers: [],
     enemies: [],
     projectiles: [],
@@ -84,11 +88,12 @@ function createInitialState(): GameState {
     towerBoostDuration: 0,
     gameTime: 0,
     battleLogs: [],
+    currentLevelId: currentLevel.id,
   };
 }
 
-function isBuildable(position: Position, towers: Tower[]): boolean {
-  const isOnBuildSpot = BUILDABLE_POSITIONS.some(
+function isBuildable(position: Position, towers: Tower[], buildablePositions: Position[]): boolean {
+  const isOnBuildSpot = buildablePositions.some(
     (p) => p.x === position.x && p.y === position.y
   );
   if (!isOnBuildSpot) return false;
@@ -118,7 +123,7 @@ function getTowerWorldPosition(tower: Tower): Position {
   };
 }
 
-function moveEnemyAlongPath(enemy: Enemy, deltaTime: number): boolean {
+function moveEnemyAlongPath(enemy: Enemy, deltaTime: number, path: Position[]): boolean {
   if (enemy.freezeDuration > 0) {
     enemy.freezeDuration -= deltaTime;
     return false;
@@ -130,7 +135,7 @@ function moveEnemyAlongPath(enemy: Enemy, deltaTime: number): boolean {
     enemy.slowDuration -= deltaTime;
   }
 
-  const targetPathPoint = PATH[enemy.pathIndex + 1];
+  const targetPathPoint = path[enemy.pathIndex + 1];
   if (!targetPathPoint) {
     return true;
   }
@@ -146,7 +151,7 @@ function moveEnemyAlongPath(enemy: Enemy, deltaTime: number): boolean {
 
   if (distance < 1) {
     enemy.pathIndex++;
-    if (enemy.pathIndex >= PATH.length - 1) {
+    if (enemy.pathIndex >= path.length - 1) {
       return true;
     }
     return false;
@@ -162,6 +167,7 @@ function moveEnemyAlongPath(enemy: Enemy, deltaTime: number): boolean {
 }
 
 interface GameStore extends GameState {
+  currentLevelId: string;
   startGame: () => void;
   pauseGame: () => void;
   resumeGame: () => void;
@@ -177,10 +183,31 @@ interface GameStore extends GameState {
   startWave: () => void;
   tick: (deltaTime: number) => void;
   addBattleLog: (type: BattleLogType, message: string) => void;
+  setLevel: (level: LevelData) => void;
+  getPath: () => Position[];
+  getBuildablePositions: () => Position[];
+  getWaves: () => { enemies: { type: EnemyType; count: number; interval: number }[] }[];
+  getInitialLives: () => number;
+}
+
+const CUSTOM_LEVELS_KEY = 'td_custom_levels';
+
+export function loadLevelFromStorage(levelId: string): LevelData | null {
+  try {
+    const stored = localStorage.getItem(CUSTOM_LEVELS_KEY);
+    if (stored) {
+      const levels: LevelData[] = JSON.parse(stored);
+      return levels.find((l) => l.id === levelId) || null;
+    }
+  } catch (e) {
+    console.error('Failed to load level from storage:', e);
+  }
+  return null;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
   ...createInitialState(),
+  currentLevelId: 'default',
 
   startGame: () => {
     set({ status: 'playing' });
@@ -201,7 +228,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   restartGame: () => {
-    set(createInitialState());
+    const levelId = get().currentLevelId;
+    let level: LevelData | undefined;
+    
+    if (levelId === 'default') {
+      level = getDefaultLevel();
+    } else {
+      const storedLevel = loadLevelFromStorage(levelId);
+      if (storedLevel) {
+        level = storedLevel;
+      } else {
+        level = getDefaultLevel();
+      }
+    }
+    
+    set(createInitialState(level));
   },
 
   selectTowerType: (type) => {
@@ -215,9 +256,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   buildTower: (gridPosition) => {
     const state = get();
     const { selectedTowerType, gold, towers, effects } = state;
+    const buildablePositions = get().getBuildablePositions();
 
     if (!selectedTowerType) return;
-    if (!isBuildable(gridPosition, towers)) return;
+    if (!isBuildable(gridPosition, towers, buildablePositions)) return;
 
     const config = TOWER_CONFIGS[selectedTowerType];
     const levelConfig = config.levels[0];
@@ -351,6 +393,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let newLives = lives;
     let newTowerBoostMultiplier = towerBoostMultiplier;
     let newTowerBoostDuration = towerBoostDuration;
+    const initialLives = get().getInitialLives();
 
     switch (selectedCard.type) {
       case 'fireball':
@@ -422,7 +465,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       case 'heal':
-        newLives = Math.min(INITIAL_LIVES, lives + (config.healAmount || 5));
+        newLives = Math.min(initialLives, lives + (config.healAmount || 5));
         newEffects.push({
           id: generateId(),
           type: 'heal',
@@ -502,11 +545,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   startWave: () => {
     const state = get();
     const { wave, waveInProgress, maxWaves, status } = state;
+    const waves = get().getWaves();
 
     if (waveInProgress || status !== 'playing') return;
     if (wave >= maxWaves) return;
 
-    const waveConfig = WAVE_CONFIGS[wave];
+    const waveConfig = waves[wave];
     const spawnQueue: { type: EnemyType; spawnTime: number }[] = [];
     let totalTime = 0;
 
@@ -538,6 +582,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   tick: (deltaTime) => {
     const state = get();
     const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, gameTime } = state;
+    const path = get().getPath();
 
     if (status !== 'playing') return;
 
@@ -576,7 +621,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         spawnQueue.forEach((spawn) => {
           if (spawn.spawnTime <= newWaveTime) {
             const config = ENEMY_CONFIGS[spawn.type];
-            const startPos = PATH[0];
+            const startPos = path[0];
             const newEnemy: Enemy = {
               id: generateId(),
               type: spawn.type,
@@ -604,7 +649,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const reachedEnd: string[] = [];
       newEnemies.forEach((enemy) => {
-        const reached = moveEnemyAlongPath(enemy, deltaTime);
+        const reached = moveEnemyAlongPath(enemy, deltaTime, path);
         if (reached) {
           reachedEnd.push(enemy.id);
           newLives--;
@@ -775,5 +820,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
     };
     const newLogs = [newLog, ...battleLogs].slice(0, MAX_BATTLE_LOGS);
     set({ battleLogs: newLogs });
+  },
+
+  setLevel: (level) => {
+    set(createInitialState(level));
+  },
+
+  getPath: () => {
+    const state = get();
+    if (state.currentLevelId === 'default') {
+      return PATH;
+    }
+    const level = loadLevelFromStorage(state.currentLevelId);
+    return level?.path || PATH;
+  },
+
+  getBuildablePositions: () => {
+    const state = get();
+    if (state.currentLevelId === 'default') {
+      return BUILDABLE_POSITIONS;
+    }
+    const level = loadLevelFromStorage(state.currentLevelId);
+    return level?.buildablePositions || BUILDABLE_POSITIONS;
+  },
+
+  getWaves: () => {
+    const state = get();
+    if (state.currentLevelId === 'default') {
+      return WAVE_CONFIGS;
+    }
+    const level = loadLevelFromStorage(state.currentLevelId);
+    return level?.waves || WAVE_CONFIGS;
+  },
+
+  getInitialLives: () => {
+    const state = get();
+    if (state.currentLevelId === 'default') {
+      return INITIAL_LIVES;
+    }
+    const level = loadLevelFromStorage(state.currentLevelId);
+    return level?.initialLives || INITIAL_LIVES;
   },
 }));

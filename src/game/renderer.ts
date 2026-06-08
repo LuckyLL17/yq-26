@@ -1,5 +1,6 @@
 import type { Tower, Enemy, Projectile, Effect, Position } from './types';
 import { TOWER_CONFIGS, ENEMY_CONFIGS, CARD_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, getTowerLevelConfig } from './config';
+import { getDefaultLevel } from './levelEditor';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -75,12 +76,17 @@ export class GameRenderer {
     selectedTowerId: string | null,
     selectedCardType: string | null,
     mousePosition: Position | null,
-    deltaTime: number
+    deltaTime: number,
+    path?: Position[],
+    buildablePositions?: Position[]
   ) {
+    const currentPath = path || getDefaultLevel().path;
+    const currentBuildablePositions = buildablePositions || getDefaultLevel().buildablePositions;
+
     this.updateParticles(deltaTime);
     this.drawBackground();
-    this.drawPath();
-    this.drawBuildablePositions(towers, selectedTowerType);
+    this.drawPath(currentPath);
+    this.drawBuildablePositions(towers, selectedTowerType, currentBuildablePositions);
     this.drawTowers(towers, selectedTowerId);
     this.drawSelectedTowerRange(towers, selectedTowerId);
     this.drawEnemies(enemies);
@@ -88,7 +94,7 @@ export class GameRenderer {
     this.drawEffects(effects);
     this.drawParticles();
     this.drawLevelUpTexts(effects);
-    this.drawSelectionIndicator(selectedTowerType, selectedCardType, mousePosition, towers);
+    this.drawSelectionIndicator(selectedTowerType, selectedCardType, mousePosition, towers, currentBuildablePositions);
   }
 
   private drawBackground() {
@@ -133,14 +139,14 @@ export class GameRenderer {
     });
   }
 
-  private drawPath() {
+  private drawPath(path: Position[]) {
     const ctx = this.ctx;
 
     ctx.beginPath();
-    ctx.moveTo(PATH[0].x * TILE_SIZE + TILE_SIZE / 2, PATH[0].y * TILE_SIZE + TILE_SIZE / 2);
+    ctx.moveTo(path[0].x * TILE_SIZE + TILE_SIZE / 2, path[0].y * TILE_SIZE + TILE_SIZE / 2);
 
-    for (let i = 1; i < PATH.length; i++) {
-      ctx.lineTo(PATH[i].x * TILE_SIZE + TILE_SIZE / 2, PATH[i].y * TILE_SIZE + TILE_SIZE / 2);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x * TILE_SIZE + TILE_SIZE / 2, path[i].y * TILE_SIZE + TILE_SIZE / 2);
     }
 
     ctx.strokeStyle = 'rgba(139, 69, 19, 0.6)';
@@ -159,8 +165,8 @@ export class GameRenderer {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const start = PATH[0];
-    const end = PATH[PATH.length - 1];
+    const start = path[0];
+    const end = path[path.length - 1];
 
     ctx.fillStyle = '#22c55e';
     ctx.beginPath();
@@ -180,10 +186,10 @@ export class GameRenderer {
     ctx.fillText('出', end.x * TILE_SIZE + TILE_SIZE / 2, end.y * TILE_SIZE + TILE_SIZE / 2);
   }
 
-  private drawBuildablePositions(towers: Tower[], selectedTowerType: string | null) {
+  private drawBuildablePositions(towers: Tower[], selectedTowerType: string | null, buildablePositions: Position[]) {
     const ctx = this.ctx;
 
-    BUILDABLE_POSITIONS.forEach((pos) => {
+    buildablePositions.forEach((pos) => {
       const hasTower = towers.some((t) => t.position.x === pos.x && t.position.y === pos.y);
       if (hasTower) return;
 
@@ -554,7 +560,8 @@ export class GameRenderer {
     selectedTowerType: string | null,
     selectedCardType: string | null,
     mousePosition: Position | null,
-    towers: Tower[]
+    towers: Tower[],
+    buildablePositions: Position[]
   ) {
     if (!mousePosition) return;
 
@@ -565,7 +572,7 @@ export class GameRenderer {
     if (selectedTowerType) {
       const config = TOWER_CONFIGS[selectedTowerType];
       const levelConfig = getTowerLevelConfig(selectedTowerType, 1);
-      const canBuild = BUILDABLE_POSITIONS.some((p) => p.x === gridX && p.y === gridY) &&
+      const canBuild = buildablePositions.some((p) => p.x === gridX && p.y === gridY) &&
         !towers.some((t) => t.position.x === gridX && t.position.y === gridY);
 
       ctx.strokeStyle = canBuild ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';

@@ -140,6 +140,7 @@ export interface GameState {
   towerBoostDuration: number;
   gameTime: number;
   battleLogs: BattleLogEntry[];
+  currentLevelId: string;
 }
 
 export type BattleLogType =
@@ -174,4 +175,28 @@ export type GameAction =
   | { type: 'DRAW_CARD'; count: number }
   | { type: 'START_WAVE' }
   | { type: 'TICK'; deltaTime: number }
-  | { type: 'ADD_EFFECT'; effect: Effect };
+  | { type: 'ADD_EFFECT'; effect: Effect }
+  | { type: 'SET_LEVEL'; level: LevelData };
+
+export interface LevelData {
+  id: string;
+  name: string;
+  description: string;
+  path: Position[];
+  buildablePositions: Position[];
+  waves: WaveConfig[];
+  initialGold: number;
+  initialLives: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type EditorTool = 'path' | 'build' | 'erase';
+
+export interface LevelEditorState {
+  level: LevelData;
+  selectedTool: EditorTool;
+  selectedPathIndex: number | null;
+  isDirty: boolean;
+  savedLevels: LevelData[];
+}
