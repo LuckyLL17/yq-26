@@ -1,4 +1,5 @@
 import { useGameStore } from '@/game/store';
+import { RARITY_COLORS, RARITY_NAMES } from '@/game/config';
 import type { Card } from '@/game/types';
 
 export default function CardHand() {
@@ -7,7 +8,7 @@ export default function CardHand() {
   const canUseCard = (card: Card) => mana >= card.manaCost && status === 'playing';
 
   const isTargetedCard = (cardType: string) => {
-    return ['fireball', 'freeze'].includes(cardType);
+    return ['fireball', 'freeze', 'meteor'].includes(cardType);
   };
 
   return (
@@ -45,13 +46,30 @@ export default function CardHand() {
               `}
               style={{
                 transform: `rotate(${rotation}deg) ${isSelected ? 'translateY(-16px) scale(1.1)' : ''}`,
+                borderColor: !isSelected && canUse ? RARITY_COLORS[card.rarity] + '80' : undefined,
+                boxShadow: !isSelected && canUse && card.rarity !== 'common'
+                  ? `0 0 10px ${RARITY_COLORS[card.rarity]}40`
+                  : undefined,
               }}
             >
-              <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white border-2 border-game-panel">
+              <div
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-game-panel"
+                style={{ backgroundColor: RARITY_COLORS[card.rarity] }}
+              >
                 {card.manaCost}
               </div>
 
-              <div className="text-3xl mt-2">{card.icon}</div>
+              <div
+                className="absolute top-1 left-1 text-[8px] font-bold px-1 rounded"
+                style={{
+                  backgroundColor: RARITY_COLORS[card.rarity] + '30',
+                  color: RARITY_COLORS[card.rarity],
+                }}
+              >
+                {RARITY_NAMES[card.rarity]}
+              </div>
+
+              <div className="text-3xl mt-4">{card.icon}</div>
 
               <div className="text-center">
                 <div className="text-xs font-bold text-white">{card.name}</div>
@@ -78,6 +96,15 @@ export default function CardHand() {
           <div className="flex items-center gap-2 mb-2">
             <span className="text-2xl">{selectedCard.icon}</span>
             <span className="font-bold text-white">{selectedCard.name}</span>
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded"
+              style={{
+                backgroundColor: RARITY_COLORS[selectedCard.rarity] + '30',
+                color: RARITY_COLORS[selectedCard.rarity],
+              }}
+            >
+              {RARITY_NAMES[selectedCard.rarity]}
+            </span>
             <span className="text-blue-400 text-sm ml-auto">消耗 {selectedCard.manaCost} 法力</span>
           </div>
           <p className="text-sm text-gray-300">{selectedCard.description}</p>

@@ -1,8 +1,21 @@
-export type TowerType = 'arrow' | 'mage' | 'ice';
+export type TowerType = 'arrow' | 'mage' | 'ice' | 'lightning' | 'poison' | 'sniper';
 
 export type EnemyType = 'normal' | 'fast' | 'tank' | 'boss';
 
-export type CardType = 'fireball' | 'freeze' | 'lightning' | 'heal' | 'gold_rain' | 'tower_boost';
+export type CardType =
+  | 'fireball'
+  | 'freeze'
+  | 'lightning'
+  | 'heal'
+  | 'gold_rain'
+  | 'tower_boost'
+  | 'meteor'
+  | 'summon'
+  | 'mana_surge'
+  | 'time_warp'
+  | 'divine_shield';
+
+export type CardRarity = 'common' | 'rare' | 'epic' | 'legendary';
 
 export type GameStatus = 'idle' | 'playing' | 'paused' | 'won' | 'lost';
 
@@ -31,6 +44,8 @@ export interface Enemy {
   slowEffect: number;
   slowDuration: number;
   freezeDuration: number;
+  poisonDamage: number;
+  poisonDuration: number;
   reward: number;
 }
 
@@ -44,6 +59,12 @@ export interface Projectile {
   splashRadius?: number;
   slowEffect?: number;
   slowDuration?: number;
+  chainCount?: number;
+  chainDamageDecay?: number;
+  hitTargets?: string[];
+  poisonDamage?: number;
+  poisonDuration?: number;
+  isSniper?: boolean;
 }
 
 export interface Card {
@@ -53,16 +74,35 @@ export interface Card {
   description: string;
   manaCost: number;
   icon: string;
+  rarity: CardRarity;
 }
 
 export interface Effect {
   id: string;
-  type: 'explosion' | 'freeze' | 'lightning' | 'heal' | 'gold' | 'tower_boost' | 'build' | 'upgrade' | 'level_up';
+  type:
+    | 'explosion'
+    | 'freeze'
+    | 'lightning'
+    | 'heal'
+    | 'gold'
+    | 'tower_boost'
+    | 'build'
+    | 'upgrade'
+    | 'level_up'
+    | 'poison'
+    | 'sniper'
+    | 'chain_lightning'
+    | 'meteor'
+    | 'summon'
+    | 'mana_surge'
+    | 'time_warp'
+    | 'divine_shield';
   position: Position;
   duration: number;
   maxDuration: number;
   radius?: number;
   towerId?: string;
+  chainTargets?: Position[];
 }
 
 export interface WaveConfig {
@@ -77,6 +117,12 @@ export interface TowerLevelConfig {
   splashRadius?: number;
   slowEffect?: number;
   slowDuration?: number;
+  chainCount?: number;
+  chainDamageDecay?: number;
+  poisonDamage?: number;
+  poisonDuration?: number;
+  critChance?: number;
+  critMultiplier?: number;
 }
 
 export interface TowerConfig {
@@ -95,12 +141,19 @@ export interface CardConfig {
   description: string;
   manaCost: number;
   icon: string;
+  rarity: CardRarity;
   damage?: number;
   radius?: number;
   duration?: number;
   healAmount?: number;
   goldAmount?: number;
   boostMultiplier?: number;
+  summonCount?: number;
+  summonDamage?: number;
+  manaAmount?: number;
+  shieldAmount?: number;
+  slowEffect?: number;
+  timeScale?: number;
 }
 
 export interface EnemyConfig {
@@ -138,6 +191,10 @@ export interface GameState {
   spawnQueue: { type: EnemyType; spawnTime: number }[];
   towerBoostMultiplier: number;
   towerBoostDuration: number;
+  divineShield: number;
+  divineShieldDuration: number;
+  timeWarpDuration: number;
+  timeWarpScale: number;
   gameTime: number;
   battleLogs: BattleLogEntry[];
   currentLevelId: string;

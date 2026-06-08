@@ -55,6 +55,48 @@ export const TOWER_CONFIGS: Record<string, TowerConfig> = {
       { damage: 22, attackSpeed: 0.7, range: 140, cost: 160, slowEffect: 0.7, slowDuration: 3 },
     ],
   },
+  lightning: {
+    name: '闪电塔',
+    maxLevel: 3,
+    color: '#fbbf24',
+    projectileColor: '#fef08a',
+    projectileSpeed: 600,
+    icon: '⚡',
+    description: '闪电连锁，攻击多个敌人',
+    levels: [
+      { damage: 20, attackSpeed: 1.2, range: 130, cost: 120, chainCount: 2, chainDamageDecay: 0.7 },
+      { damage: 32, attackSpeed: 1.0, range: 150, cost: 180, chainCount: 3, chainDamageDecay: 0.75 },
+      { damage: 50, attackSpeed: 0.8, range: 180, cost: 260, chainCount: 4, chainDamageDecay: 0.8 },
+    ],
+  },
+  poison: {
+    name: '剧毒塔',
+    maxLevel: 3,
+    color: '#22c55e',
+    projectileColor: '#86efac',
+    projectileSpeed: 280,
+    icon: '☠️',
+    description: '造成持续毒素伤害',
+    levels: [
+      { damage: 10, attackSpeed: 1.3, range: 110, cost: 90, poisonDamage: 8, poisonDuration: 4 },
+      { damage: 16, attackSpeed: 1.1, range: 130, cost: 140, poisonDamage: 15, poisonDuration: 5 },
+      { damage: 25, attackSpeed: 0.9, range: 150, cost: 210, poisonDamage: 25, poisonDuration: 6 },
+    ],
+  },
+  sniper: {
+    name: '狙击塔',
+    maxLevel: 3,
+    color: '#dc2626',
+    projectileColor: '#fca5a5',
+    projectileSpeed: 800,
+    icon: '🎯',
+    description: '超远射程，高暴击',
+    levels: [
+      { damage: 60, attackSpeed: 2.0, range: 250, cost: 150, critChance: 0.2, critMultiplier: 2.0 },
+      { damage: 95, attackSpeed: 1.7, range: 280, cost: 220, critChance: 0.3, critMultiplier: 2.5 },
+      { damage: 150, attackSpeed: 1.4, range: 320, cost: 320, critChance: 0.4, critMultiplier: 3.0 },
+    ],
+  },
 };
 
 export const CARD_CONFIGS: Record<string, CardConfig> = {
@@ -63,6 +105,7 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '对目标区域造成大量伤害',
     manaCost: 30,
     icon: '🔥',
+    rarity: 'common',
     damage: 80,
     radius: 60,
   },
@@ -71,6 +114,7 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '冻结范围内敌人3秒',
     manaCost: 25,
     icon: '🧊',
+    rarity: 'common',
     radius: 80,
     duration: 3,
   },
@@ -79,6 +123,7 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '连锁攻击3个敌人',
     manaCost: 35,
     icon: '⚡',
+    rarity: 'common',
     damage: 50,
   },
   heal: {
@@ -86,6 +131,7 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '恢复5点生命值',
     manaCost: 20,
     icon: '💚',
+    rarity: 'common',
     healAmount: 5,
   },
   gold_rain: {
@@ -93,6 +139,7 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '获得100金币',
     manaCost: 15,
     icon: '💰',
+    rarity: 'common',
     goldAmount: 100,
   },
   tower_boost: {
@@ -100,9 +147,76 @@ export const CARD_CONFIGS: Record<string, CardConfig> = {
     description: '所有塔攻击力提升50%，持续10秒',
     manaCost: 40,
     icon: '💪',
+    rarity: 'rare',
     boostMultiplier: 1.5,
     duration: 10,
   },
+  meteor: {
+    name: '陨石术',
+    description: '召唤陨石造成毁灭性范围伤害',
+    manaCost: 60,
+    icon: '☄️',
+    rarity: 'epic',
+    damage: 200,
+    radius: 100,
+  },
+  summon: {
+    name: '召唤石像鬼',
+    description: '召唤3个石像鬼攻击敌人',
+    manaCost: 45,
+    icon: '👹',
+    rarity: 'rare',
+    summonCount: 3,
+    summonDamage: 30,
+    duration: 15,
+  },
+  mana_surge: {
+    name: '法力涌动',
+    description: '立即恢复50点法力值',
+    manaCost: 0,
+    icon: '💠',
+    rarity: 'rare',
+    manaAmount: 50,
+  },
+  time_warp: {
+    name: '时间扭曲',
+    description: '所有塔攻速提升100%，持续8秒',
+    manaCost: 55,
+    icon: '⏳',
+    rarity: 'epic',
+    timeScale: 0.5,
+    duration: 8,
+  },
+  divine_shield: {
+    name: '神圣护盾',
+    description: '获得10点护盾，抵挡敌人伤害',
+    manaCost: 50,
+    icon: '🛡️',
+    rarity: 'legendary',
+    shieldAmount: 10,
+    duration: 30,
+  },
+};
+
+export const RARITY_WEIGHTS: Record<string, number> = {
+  common: 50,
+  rare: 30,
+  epic: 15,
+  legendary: 5,
+};
+
+export const RARITY_COLORS: Record<string, string> = {
+  common: '#9ca3af',
+  rare: '#3b82f6',
+  epic: '#a855f7',
+  legendary: '#f59e0b',
+};
+
+export const RARITY_NAMES: Record<string, string> = {
+  common: '普通',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
 };
 
 export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
@@ -183,13 +297,35 @@ export const BUILDABLE_POSITIONS: Position[] = [
 ];
 
 export function generateRandomDeck(): string[] {
-  const cardTypes = Object.keys(CARD_CONFIGS);
   const deck: string[] = [];
-  const deckSize = 15;
+  const deckSize = 20;
+
+  const rarityCards: Record<string, string[]> = {};
+  Object.entries(CARD_CONFIGS).forEach(([type, config]) => {
+    if (!rarityCards[config.rarity]) {
+      rarityCards[config.rarity] = [];
+    }
+    rarityCards[config.rarity].push(type);
+  });
+
+  const totalWeight = Object.values(RARITY_WEIGHTS).reduce((sum, w) => sum + w, 0);
 
   for (let i = 0; i < deckSize; i++) {
-    const randomIndex = Math.floor(Math.random() * cardTypes.length);
-    deck.push(cardTypes[randomIndex]);
+    const roll = Math.random() * totalWeight;
+    let cumulative = 0;
+    let selectedRarity = 'common';
+
+    for (const [rarity, weight] of Object.entries(RARITY_WEIGHTS)) {
+      cumulative += weight;
+      if (roll <= cumulative) {
+        selectedRarity = rarity;
+        break;
+      }
+    }
+
+    const cardsOfRarity = rarityCards[selectedRarity] || rarityCards['common'];
+    const randomIndex = Math.floor(Math.random() * cardsOfRarity.length);
+    deck.push(cardsOfRarity[randomIndex]);
   }
 
   return deck;

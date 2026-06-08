@@ -50,6 +50,7 @@ function createInitialState(level?: LevelData): GameState {
       description: CARD_CONFIGS[type].description,
       manaCost: CARD_CONFIGS[type].manaCost,
       icon: CARD_CONFIGS[type].icon,
+      rarity: CARD_CONFIGS[type].rarity,
     }))
   );
 
@@ -86,6 +87,10 @@ function createInitialState(level?: LevelData): GameState {
     spawnQueue: [],
     towerBoostMultiplier: 1,
     towerBoostDuration: 0,
+    divineShield: 0,
+    divineShieldDuration: 0,
+    timeWarpDuration: 0,
+    timeWarpScale: 1,
     gameTime: 0,
     battleLogs: [],
     currentLevelId: currentLevel.id,
@@ -381,7 +386,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   playCard: (targetPosition) => {
     const state = get();
-    const { selectedCard, hand, discardPile, mana, effects, enemies, gold, lives, towerBoostMultiplier, towerBoostDuration } = state;
+    const { selectedCard, hand, discardPile, mana, effects, enemies, gold, lives, towerBoostMultiplier, towerBoostDuration, divineShield, divineShieldDuration, timeWarpDuration, timeWarpScale, maxMana } = state;
 
     if (!selectedCard) return;
     if (mana < selectedCard.manaCost) return;
@@ -391,8 +396,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let newEnemies = [...enemies];
     let newGold = gold;
     let newLives = lives;
+    let newMana = mana;
     let newTowerBoostMultiplier = towerBoostMultiplier;
     let newTowerBoostDuration = towerBoostDuration;
+    let newDivineShield = divineShield;
+    let newDivineShieldDuration = divineShieldDuration;
+    let newTimeWarpDuration = timeWarpDuration;
+    let newTimeWarpScale = timeWarpScale;
     const initialLives = get().getInitialLives();
 
     switch (selectedCard.type) {
@@ -500,6 +510,79 @@ export const useGameStore = create<GameStore>((set, get) => ({
           radius: 200,
         });
         break;
+
+      case 'meteor':
+        if (targetPosition) {
+          newEffects.push({
+            id: generateId(),
+            type: 'meteor',
+            position: targetPosition,
+            duration: 1.2,
+            maxDuration: 1.2,
+            radius: config.radius,
+          });
+          newEnemies = newEnemies.map((enemy) => {
+            const enemyWorldPos = getEnemyWorldPosition(enemy);
+            const dist = getDistance(enemyWorldPos, targetPosition);
+            if (dist <= (config.radius || 0)) {
+              return { ...enemy, health: enemy.health - (config.damage || 0) };
+            }
+            return enemy;
+          });
+        }
+        break;
+
+      case 'summon':
+        newEnemies = newEnemies.map((enemy) => {
+          return { ...enemy, health: enemy.health - (config.summonDamage || 30) * (config.summonCount || 3) };
+        });
+        newEffects.push({
+          id: generateId(),
+          type: 'summon',
+          position: { x: (TILE_SIZE * 16) / 2, y: (TILE_SIZE * 10) / 2 },
+          duration: 1,
+          maxDuration: 1,
+          radius: 150,
+        });
+        break;
+
+      case 'mana_surge':
+        newMana = Math.min(maxMana, mana + (config.manaAmount || 50));
+        newEffects.push({
+          id: generateId(),
+          type: 'mana_surge',
+          position: { x: (TILE_SIZE * 16) / 2, y: (TILE_SIZE * 10) / 2 },
+          duration: 1,
+          maxDuration: 1,
+          radius: 100,
+        });
+        break;
+
+      case 'time_warp':
+        newTimeWarpScale = config.timeScale || 0.5;
+        newTimeWarpDuration = config.duration || 8;
+        newEffects.push({
+          id: generateId(),
+          type: 'time_warp',
+          position: { x: (TILE_SIZE * 16) / 2, y: (TILE_SIZE * 10) / 2 },
+          duration: 1,
+          maxDuration: 1,
+          radius: 200,
+        });
+        break;
+
+      case 'divine_shield':
+        newDivineShield = (newDivineShield || 0) + (config.shieldAmount || 10);
+        newDivineShieldDuration = Math.max(newDivineShieldDuration, config.duration || 30);
+        newEffects.push({
+          id: generateId(),
+          type: 'divine_shield',
+          position: { x: (TILE_SIZE * 16) / 2, y: (TILE_SIZE * 10) / 2 },
+          duration: 1.5,
+          maxDuration: 1.5,
+          radius: 120,
+        });
+        break;
     }
 
     const newHand = hand.filter((c) => c.id !== selectedCard.id);
@@ -508,7 +591,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       hand: newHand,
       discardPile: newDiscardPile,
-      mana: mana - selectedCard.manaCost,
+      mana: newMana - selectedCard.manaCost,
       selectedCard: null,
       effects: newEffects,
       enemies: newEnemies,
@@ -516,6 +599,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       lives: newLives,
       towerBoostMultiplier: newTowerBoostMultiplier,
       towerBoostDuration: newTowerBoostDuration,
+      divineShield: newDivineShield,
+      divineShieldDuration: newDivineShieldDuration,
+      timeWarpDuration: newTimeWarpDuration,
+      timeWarpScale: newTimeWarpScale,
     });
 
     get().addBattleLog('card', `使用了 ${selectedCard.name}`);
@@ -601,12 +688,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     let newTowerBoostDuration = towerBoostDuration;
     let newTowerBoostMultiplier = towerBoostMultiplier;
+    let newDivineShield = divineShield;
+    let newDivineShieldDuration = divineShieldDuration;
+    let newTimeWarpDuration = timeWarpDuration;
+    let newTimeWarpScale = timeWarpScale;
 
     if (towerBoostDuration > 0) {
       newTowerBoostDuration -= deltaTime;
       if (newTowerBoostDuration <= 0) {
         newTowerBoostMultiplier = 1;
         newTowerBoostDuration = 0;
+      }
+    }
+
+    if (newDivineShieldDuration > 0) {
+      newDivineShieldDuration -= deltaTime;
+      if (newDivineShieldDuration <= 0) {
+        newDivineShield = 0;
+        newDivineShieldDuration = 0;
+      }
+    }
+
+    if (newTimeWarpDuration > 0) {
+      newTimeWarpDuration -= deltaTime;
+      if (newTimeWarpDuration <= 0) {
+        newTimeWarpScale = 1;
+        newTimeWarpDuration = 0;
       }
     }
 
@@ -636,6 +743,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
               slowEffect: 0,
               slowDuration: 0,
               freezeDuration: 0,
+              poisonDamage: 0,
+              poisonDuration: 0,
               reward: config.reward,
             };
             newEnemies.push(newEnemy);
@@ -648,16 +757,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       const reachedEnd: string[] = [];
+      let shieldDamage = 0;
       newEnemies.forEach((enemy) => {
         const reached = moveEnemyAlongPath(enemy, deltaTime, path);
         if (reached) {
           reachedEnd.push(enemy.id);
-          newLives--;
+          if (newDivineShield > 0) {
+            shieldDamage++;
+            newDivineShield--;
+          } else {
+            newLives--;
+          }
         }
       });
 
       if (reachedEnd.length > 0) {
-        get().addBattleLog('warning', `${reachedEnd.length} 个敌人突破了防线！`);
+        if (shieldDamage > 0) {
+          get().addBattleLog('info', `护盾抵挡了 ${shieldDamage} 点伤害！`);
+        }
+        if (reachedEnd.length - shieldDamage > 0) {
+          get().addBattleLog('warning', `${reachedEnd.length - shieldDamage} 个敌人突破了防线！`);
+        }
       }
 
       newEnemies = newEnemies.filter((e) => !reachedEnd.includes(e.id));
@@ -682,7 +802,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const levelConfig = getTowerLevelConfig(tower.type, tower.level);
         const towerPos = getTowerWorldPosition(tower);
 
-        if (newGameTime - tower.lastAttackTime < levelConfig.attackSpeed) return;
+        const attackCooldown = levelConfig.attackSpeed * (newTimeWarpScale || 1);
+        if (newGameTime - tower.lastAttackTime < attackCooldown) return;
 
         let nearestEnemy: Enemy | null = null;
         let nearestDist = Infinity;
@@ -702,22 +823,40 @@ export const useGameStore = create<GameStore>((set, get) => ({
           tower.angle = angle;
           tower.lastAttackTime = newGameTime;
 
+          let damage = levelConfig.damage * newTowerBoostMultiplier;
+          let isCrit = false;
+
+          if (tower.type === 'sniper' && levelConfig.critChance && levelConfig.critMultiplier) {
+            if (Math.random() < levelConfig.critChance) {
+              damage *= levelConfig.critMultiplier;
+              isCrit = true;
+            }
+          }
+
           const projectile: Projectile = {
             id: generateId(),
             position: { ...towerPos },
             targetId: nearestEnemy.id,
             speed: towerConfig.projectileSpeed,
-            damage: levelConfig.damage * newTowerBoostMultiplier,
+            damage,
             type: tower.type,
             splashRadius: levelConfig.splashRadius,
             slowEffect: levelConfig.slowEffect,
             slowDuration: levelConfig.slowDuration,
+            chainCount: levelConfig.chainCount,
+            chainDamageDecay: levelConfig.chainDamageDecay,
+            hitTargets: tower.type === 'lightning' ? [nearestEnemy.id] : undefined,
+            poisonDamage: levelConfig.poisonDamage,
+            poisonDuration: levelConfig.poisonDuration,
+            isSniper: isCrit,
           };
           newProjectiles.push(projectile);
         }
       });
 
       const projectilesToRemove: string[] = [];
+      const newChainProjectiles: Projectile[] = [];
+
       newProjectiles.forEach((proj) => {
         const target = newEnemies.find((e) => e.id === proj.targetId);
         if (!target) {
@@ -749,6 +888,62 @@ export const useGameStore = create<GameStore>((set, get) => ({
             target.slowEffect = proj.slowEffect;
             target.slowDuration = proj.slowDuration;
           }
+
+          if (proj.poisonDamage && proj.poisonDuration) {
+            target.poisonDamage = Math.max(target.poisonDamage, proj.poisonDamage);
+            target.poisonDuration = Math.max(target.poisonDuration, proj.poisonDuration);
+          }
+
+          if (proj.chainCount && proj.chainCount > 0 && proj.hitTargets) {
+            let nextTarget: Enemy | null = null;
+            let nextDist = Infinity;
+            const chainRange = 150;
+
+            newEnemies.forEach((enemy) => {
+              if (proj.hitTargets!.includes(enemy.id)) return;
+              const enemyPos = getEnemyWorldPosition(enemy);
+              const d = getDistance(targetPos, enemyPos);
+              if (d <= chainRange && d < nextDist) {
+                nextDist = d;
+                nextTarget = enemy;
+              }
+            });
+
+            if (nextTarget) {
+              const chainDamage = proj.damage * (proj.chainDamageDecay || 0.7);
+              const chainProjectile: Projectile = {
+                id: generateId(),
+                position: { ...targetPos },
+                targetId: nextTarget.id,
+                speed: 800,
+                damage: chainDamage,
+                type: 'lightning',
+                chainCount: proj.chainCount - 1,
+                chainDamageDecay: proj.chainDamageDecay,
+                hitTargets: [...proj.hitTargets, nextTarget.id],
+              };
+              newChainProjectiles.push(chainProjectile);
+
+              newEffects.push({
+                id: generateId(),
+                type: 'chain_lightning',
+                position: targetPos,
+                duration: 0.2,
+                maxDuration: 0.2,
+                chainTargets: [targetPos, getEnemyWorldPosition(nextTarget)],
+              });
+            }
+          }
+
+          if (proj.isSniper) {
+            newEffects.push({
+              id: generateId(),
+              type: 'sniper',
+              position: targetPos,
+              duration: 0.4,
+              maxDuration: 0.4,
+            });
+          }
         } else {
           const moveDist = proj.speed * deltaTime;
           const ratio = moveDist / dist;
@@ -758,6 +953,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
 
       newProjectiles = newProjectiles.filter((p) => !projectilesToRemove.includes(p.id));
+      newProjectiles = [...newProjectiles, ...newChainProjectiles];
+
+      newEnemies.forEach((enemy) => {
+        if (enemy.poisonDuration > 0 && enemy.poisonDamage > 0) {
+          enemy.health -= enemy.poisonDamage * deltaTime;
+          enemy.poisonDuration -= deltaTime;
+        }
+      });
 
       let newStatus: GameStatus = status;
       if (newLives <= 0) {
@@ -790,6 +993,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         status: newStatus,
         towerBoostDuration: newTowerBoostDuration,
         towerBoostMultiplier: newTowerBoostMultiplier,
+        divineShield: newDivineShield,
+        divineShieldDuration: newDivineShieldDuration,
+        timeWarpDuration: newTimeWarpDuration,
+        timeWarpScale: newTimeWarpScale,
         gameTime: newGameTime,
       });
     } else {
@@ -805,6 +1012,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         score: newScore,
         towerBoostDuration: newTowerBoostDuration,
         towerBoostMultiplier: newTowerBoostMultiplier,
+        divineShield: newDivineShield,
+        divineShieldDuration: newDivineShieldDuration,
+        timeWarpDuration: newTimeWarpDuration,
+        timeWarpScale: newTimeWarpScale,
         gameTime: newGameTime,
       });
     }

@@ -326,6 +326,8 @@ export class GameRenderer {
         bodyColor = '#7dd3fc';
       } else if (enemy.slowDuration > 0) {
         bodyColor = '#a5f3fc';
+      } else if (enemy.poisonDuration > 0) {
+        bodyColor = '#86efac';
       }
 
       const gradient = ctx.createRadialGradient(x - config.size * 0.3, y - config.size * 0.3, 0, x, y, config.size);
@@ -376,6 +378,26 @@ export class GameRenderer {
         ctx.arc(x, y, config.size + 5, 0, Math.PI * 2);
         ctx.stroke();
       }
+
+      if (enemy.poisonDuration > 0) {
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(x, y, config.size + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const bubbleCount = 3;
+        for (let i = 0; i < bubbleCount; i++) {
+          const bubbleY = y - config.size - 5 - Math.sin(Date.now() / 300 + i) * 5;
+          const bubbleX = x + Math.cos(Date.now() / 400 + i * 2) * (config.size * 0.5);
+          ctx.beginPath();
+          ctx.arc(bubbleX, bubbleY, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.6)';
+          ctx.fill();
+        }
+      }
     });
   }
 
@@ -385,15 +407,76 @@ export class GameRenderer {
     projectiles.forEach((proj) => {
       const config = TOWER_CONFIGS[proj.type];
 
-      ctx.beginPath();
-      ctx.arc(proj.position.x, proj.position.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = config.projectileColor;
-      ctx.fill();
+      if (proj.type === 'sniper') {
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = config.projectileColor;
+        ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(proj.position.x, proj.position.y, 8, 0, Math.PI * 2);
-      ctx.fillStyle = `${config.projectileColor}40`;
-      ctx.fill();
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 10, 0, Math.PI * 2);
+        ctx.fillStyle = `${config.projectileColor}30`;
+        ctx.fill();
+
+        if (proj.isSniper) {
+          ctx.beginPath();
+          ctx.arc(proj.position.x, proj.position.y, 16, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+          ctx.fill();
+        }
+      } else if (proj.type === 'lightning') {
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = config.projectileColor;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = `${config.projectileColor}40`;
+        ctx.fill();
+
+        ctx.strokeStyle = `rgba(255, 255, 200, 0.6)`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const angle = (Math.PI * 2 * i) / 3 + Date.now() / 200;
+          ctx.beginPath();
+          ctx.moveTo(proj.position.x, proj.position.y);
+          ctx.lineTo(
+            proj.position.x + Math.cos(angle) * 10,
+            proj.position.y + Math.sin(angle) * 10
+          );
+          ctx.stroke();
+        }
+      } else if (proj.type === 'poison') {
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = config.projectileColor;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 9, 0, Math.PI * 2);
+        ctx.fillStyle = `${config.projectileColor}30`;
+        ctx.fill();
+
+        for (let i = 0; i < 3; i++) {
+          const offsetX = (Math.random() - 0.5) * 8;
+          const offsetY = (Math.random() - 0.5) * 8;
+          ctx.beginPath();
+          ctx.arc(proj.position.x + offsetX, proj.position.y + offsetY, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `${config.projectileColor}60`;
+          ctx.fill();
+        }
+      } else {
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = config.projectileColor;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(proj.position.x, proj.position.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = `${config.projectileColor}40`;
+        ctx.fill();
+      }
     });
   }
 
@@ -514,6 +597,207 @@ export class GameRenderer {
           ctx.stroke();
           break;
         }
+        case 'chain_lightning': {
+          if (effect.chainTargets && effect.chainTargets.length >= 2) {
+            ctx.strokeStyle = `rgba(255, 255, 100, ${alpha})`;
+            ctx.lineWidth = 3;
+            ctx.shadowColor = '#ffff00';
+            ctx.shadowBlur = 10;
+
+            for (let i = 0; i < effect.chainTargets.length - 1; i++) {
+              const start = effect.chainTargets[i];
+              const end = effect.chainTargets[i + 1];
+              ctx.beginPath();
+              ctx.moveTo(start.x, start.y);
+
+              const segments = 5;
+              for (let j = 1; j <= segments; j++) {
+                const t = j / segments;
+                const x = start.x + (end.x - start.x) * t + (Math.random() - 0.5) * 20;
+                const y = start.y + (end.y - start.y) * t + (Math.random() - 0.5) * 20;
+                ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+            }
+
+            ctx.shadowBlur = 0;
+          }
+          break;
+        }
+        case 'sniper': {
+          const radius = (effect.radius || 30) * (0.5 + progress * 1.5);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(effect.position.x - 20, effect.position.y);
+          ctx.lineTo(effect.position.x + 20, effect.position.y);
+          ctx.moveTo(effect.position.x, effect.position.y - 20);
+          ctx.lineTo(effect.position.x, effect.position.y + 20);
+          ctx.strokeStyle = `rgba(220, 38, 38, ${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, 15, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(220, 38, 38, ${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        }
+        case 'meteor': {
+          const radius = (effect.radius || 80) * (0.3 + progress * 0.7);
+          const gradient = ctx.createRadialGradient(
+            effect.position.x,
+            effect.position.y,
+            0,
+            effect.position.x,
+            effect.position.y,
+            radius
+          );
+          gradient.addColorStop(0, `rgba(255, 100, 0, ${alpha})`);
+          gradient.addColorStop(0.4, `rgba(255, 50, 0, ${alpha * 0.8})`);
+          gradient.addColorStop(1, `rgba(100, 0, 0, 0)`);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = gradient;
+          ctx.fill();
+
+          const trailY = effect.position.y - 150 * (1 - progress);
+          const trailGradient = ctx.createLinearGradient(
+            effect.position.x,
+            effect.position.y,
+            effect.position.x,
+            trailY
+          );
+          trailGradient.addColorStop(0, `rgba(255, 150, 0, ${alpha * 0.8})`);
+          trailGradient.addColorStop(1, `rgba(255, 50, 0, 0)`);
+          ctx.beginPath();
+          ctx.moveTo(effect.position.x - 10, effect.position.y);
+          ctx.lineTo(effect.position.x + 10, effect.position.y);
+          ctx.lineTo(effect.position.x + 5, trailY);
+          ctx.lineTo(effect.position.x - 5, trailY);
+          ctx.closePath();
+          ctx.fillStyle = trailGradient;
+          ctx.fill();
+          break;
+        }
+        case 'summon': {
+          const radius = (effect.radius || 100) * (0.5 + progress * 0.5);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(147, 51, 234, ${alpha * 0.2})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(147, 51, 234, ${alpha})`;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([8, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          const runeCount = 6;
+          for (let i = 0; i < runeCount; i++) {
+            const angle = (Math.PI * 2 * i) / runeCount + progress * Math.PI;
+            const runeX = effect.position.x + Math.cos(angle) * radius * 0.8;
+            const runeY = effect.position.y + Math.sin(angle) * radius * 0.8;
+            ctx.font = '20px serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = `rgba(216, 180, 254, ${alpha})`;
+            ctx.fillText('✦', runeX, runeY);
+          }
+          break;
+        }
+        case 'mana_surge': {
+          const radius = (effect.radius || 80) * (0.5 + progress * 0.5);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(59, 130, 246, ${alpha * 0.3})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(96, 165, 250, ${alpha})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          const particleCount = 12;
+          for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount + progress * Math.PI * 2;
+            const dist = radius * (0.3 + progress * 0.7);
+            const px = effect.position.x + Math.cos(angle) * dist;
+            const py = effect.position.y + Math.sin(angle) * dist;
+            ctx.beginPath();
+            ctx.arc(px, py, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(147, 197, 253, ${alpha})`;
+            ctx.fill();
+          }
+          break;
+        }
+        case 'time_warp': {
+          const radius = (effect.radius || 150) * (0.8 + progress * 0.2);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(236, 72, 153, ${alpha * 0.15})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(244, 114, 182, ${alpha * 0.6})`;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([12, 6]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          for (let ring = 0; ring < 3; ring++) {
+            const ringRadius = radius * (0.4 + ring * 0.25);
+            const rotation = progress * Math.PI * (ring % 2 === 0 ? 2 : -2);
+            ctx.beginPath();
+            ctx.arc(effect.position.x, effect.position.y, ringRadius, rotation, rotation + Math.PI * 1.5);
+            ctx.strokeStyle = `rgba(251, 207, 232, ${alpha * (1 - ring * 0.25)})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+          break;
+        }
+        case 'divine_shield': {
+          const radius = (effect.radius || 100) * (0.6 + progress * 0.4);
+          const gradient = ctx.createRadialGradient(
+            effect.position.x,
+            effect.position.y,
+            0,
+            effect.position.x,
+            effect.position.y,
+            radius
+          );
+          gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.4})`);
+          gradient.addColorStop(0.5, `rgba(255, 215, 0, ${alpha * 0.3})`);
+          gradient.addColorStop(1, `rgba(255, 215, 0, 0)`);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = gradient;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.font = '40px serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+          ctx.fillText('🛡️', effect.position.x, effect.position.y);
+          break;
+        }
+        case 'poison': {
+          const radius = (effect.radius || 40) * (0.5 + progress * 0.5);
+          ctx.beginPath();
+          ctx.arc(effect.position.x, effect.position.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(34, 197, 94, ${alpha * 0.3})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(34, 197, 94, ${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          break;
+        }
       }
     });
   }
@@ -609,6 +893,9 @@ export class GameRenderer {
       } else if (selectedCardType === 'fireball') {
         fillColor = 'rgba(255, 100, 50, 0.2)';
         strokeColor = 'rgba(255, 100, 50, 0.6)';
+      } else if (selectedCardType === 'meteor') {
+        fillColor = 'rgba(255, 50, 0, 0.3)';
+        strokeColor = 'rgba(255, 100, 0, 0.8)';
       }
 
       ctx.beginPath();
