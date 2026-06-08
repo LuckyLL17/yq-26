@@ -146,8 +146,20 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
       const pointIndex = renderer.getPathPointAt(pos, level.path);
       if (pointIndex !== null) {
         handlePathPointClick(pointIndex);
-      } else if (selectedPathIndex !== null) {
-        insertPathPoint(selectedPathIndex, gridPos);
+      } else {
+        const segmentInfo = renderer.getPathSegmentAt(pos, level.path);
+        if (segmentInfo) {
+          insertPathPoint(segmentInfo.segmentIndex, segmentInfo.point);
+        }
+      }
+    } else if (selectedTool === 'erase') {
+      const pointIndex = renderer.getPathPointAt(pos, level.path);
+      if (pointIndex !== null) {
+        if (pointIndex !== 0 && pointIndex !== level.path.length - 1) {
+          deletePathPoint(pointIndex);
+        }
+      } else {
+        handleGridClick(gridPos);
       }
     } else {
       handleGridClick(gridPos);
@@ -245,13 +257,13 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
               
               <div className="mt-3 text-sm text-gray-400 text-center">
                 {selectedTool === 'path' && (
-                  <span>拖拽路径点移动 | 点击选中后再点击路径插入新点 | 双击中间点删除</span>
+                  <span>点击路径添加新点 | 拖拽路径点移动位置 | 双击中间点删除</span>
                 )}
                 {selectedTool === 'build' && (
                   <span>点击格子添加可建造位置 | 再次点击取消</span>
                 )}
                 {selectedTool === 'erase' && (
-                  <span>点击格子移除可建造位置</span>
+                  <span>点击路径点或建造位进行删除（起点/终点不可删）</span>
                 )}
               </div>
             </div>
@@ -375,7 +387,7 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
                         type="text"
                         value={level.name}
                         onChange={(e) => setLevelName(e.target.value)}
-                        className="w-full px-3 py-2 bg-game-dark border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60"
+                        className="w-full px-3 py-2 bg-white text-black border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60"
                       />
                     </div>
 
@@ -387,7 +399,7 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
                         value={level.description}
                         onChange={(e) => setLevelDescription(e.target.value)}
                         rows={3}
-                        className="w-full px-3 py-2 bg-game-dark border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60 resize-none"
+                        className="w-full px-3 py-2 bg-white text-black border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60 resize-none"
                       />
                     </div>
 
@@ -468,7 +480,7 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
                                     };
                                     updateWave(waveIndex, newWave);
                                   }}
-                                  className="flex-1 px-2 py-1 bg-game-dark border border-game-magic/20 rounded text-xs"
+                                  className="flex-1 px-2 py-1 bg-white text-black border border-game-magic/20 rounded text-xs"
                                 >
                                   <option value="normal">普通怪</option>
                                   <option value="fast">快速怪</option>
@@ -487,7 +499,7 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
                                     };
                                     updateWave(waveIndex, newWave);
                                   }}
-                                  className="w-14 px-2 py-1 bg-game-dark border border-game-magic/20 rounded text-xs"
+                                  className="w-14 px-2 py-1 bg-white text-black border border-game-magic/20 rounded text-xs"
                                   min="1"
                                 />
                                 <span className="text-gray-400">只</span>
@@ -517,7 +529,7 @@ export default function LevelEditor({ onBack, onPlay }: LevelEditorProps) {
                   type="text"
                   value={saveAsName || level.name}
                   onChange={(e) => setSaveAsName(e.target.value)}
-                  className="w-full px-3 py-2 bg-game-dark border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60"
+                  className="w-full px-3 py-2 bg-white text-black border border-game-magic/30 rounded-lg focus:outline-none focus:border-game-magic/60"
                   placeholder="输入关卡名称"
                 />
               </div>

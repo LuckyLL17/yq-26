@@ -214,6 +214,31 @@ export class LevelEditorRenderer {
         ctx.arc(x, y, 20, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
         ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        const segmentInfo = this.getPathSegmentAt(mousePosition, path);
+        if (segmentInfo) {
+          const x = segmentInfo.point.x * TILE_SIZE + TILE_SIZE / 2;
+          const y = segmentInfo.point.y * TILE_SIZE + TILE_SIZE / 2;
+          
+          ctx.beginPath();
+          ctx.arc(x, y, 14, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(124, 58, 237, 0.5)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(167, 139, 250, 0.9)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.font = 'bold 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('+', x, y);
+        }
       }
     } else if (selectedTool === 'build') {
       let canBuild = !isOnPath && !isBuildable;
@@ -230,19 +255,57 @@ export class LevelEditorRenderer {
       ctx.textBaseline = 'middle';
       ctx.fillText('+', gridX * TILE_SIZE + TILE_SIZE / 2, gridY * TILE_SIZE + TILE_SIZE / 2);
     } else if (selectedTool === 'erase') {
-      let canErase = isBuildable;
+      const hoveredPointIndex = this.getPathPointAt(mousePosition, path);
       
-      ctx.strokeStyle = canErase ? 'rgba(239, 68, 68, 0.9)' : 'rgba(156, 163, 175, 0.9)';
-      ctx.fillStyle = canErase ? 'rgba(239, 68, 68, 0.2)' : 'rgba(156, 163, 175, 0.2)';
-      ctx.lineWidth = 2;
-      ctx.fillRect(gridX * TILE_SIZE + 2, gridY * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-      ctx.strokeRect(gridX * TILE_SIZE + 2, gridY * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      if (hoveredPointIndex !== null) {
+        const isEndpoint = hoveredPointIndex === 0 || hoveredPointIndex === path.length - 1;
+        const point = path[hoveredPointIndex];
+        const x = point.x * TILE_SIZE + TILE_SIZE / 2;
+        const y = point.y * TILE_SIZE + TILE_SIZE / 2;
+        
+        if (isEndpoint) {
+          ctx.beginPath();
+          ctx.arc(x, y, 22, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.beginPath();
+          ctx.arc(x, y, 22, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.9)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(x - 8, y - 8);
+          ctx.lineTo(x + 8, y + 8);
+          ctx.moveTo(x + 8, y - 8);
+          ctx.lineTo(x - 8, y + 8);
+          ctx.stroke();
+        }
+      } else {
+        let canErase = isBuildable;
+        
+        ctx.strokeStyle = canErase ? 'rgba(239, 68, 68, 0.9)' : 'rgba(156, 163, 175, 0.9)';
+        ctx.fillStyle = canErase ? 'rgba(239, 68, 68, 0.2)' : 'rgba(156, 163, 175, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(gridX * TILE_SIZE + 2, gridY * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        ctx.strokeRect(gridX * TILE_SIZE + 2, gridY * TILE_SIZE + 2, TILE_SIZE - 4, TILE_SIZE - 4);
 
-      ctx.fillStyle = canErase ? 'rgba(239, 68, 68, 0.8)' : 'rgba(156, 163, 175, 0.8)';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('−', gridX * TILE_SIZE + TILE_SIZE / 2, gridY * TILE_SIZE + TILE_SIZE / 2);
+        ctx.fillStyle = canErase ? 'rgba(239, 68, 68, 0.8)' : 'rgba(156, 163, 175, 0.8)';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('−', gridX * TILE_SIZE + TILE_SIZE / 2, gridY * TILE_SIZE + TILE_SIZE / 2);
+      }
     }
   }
 
@@ -277,6 +340,46 @@ export class LevelEditorRenderer {
       
       if (dist < 20) {
         return i;
+      }
+    }
+    return null;
+  }
+
+  getPathSegmentAt(mousePos: Position, path: Position[]): { segmentIndex: number; point: Position } | null {
+    const hitRadius = TILE_SIZE * 0.5;
+
+    for (let i = 0; i < path.length - 1; i++) {
+      const start = {
+        x: path[i].x * TILE_SIZE + TILE_SIZE / 2,
+        y: path[i].y * TILE_SIZE + TILE_SIZE / 2,
+      };
+      const end = {
+        x: path[i + 1].x * TILE_SIZE + TILE_SIZE / 2,
+        y: path[i + 1].y * TILE_SIZE + TILE_SIZE / 2,
+      };
+
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      
+      if (length === 0) continue;
+
+      const t = Math.max(0, Math.min(1, 
+        ((mousePos.x - start.x) * dx + (mousePos.y - start.y) * dy) / (length * length)
+      ));
+
+      const closestX = start.x + t * dx;
+      const closestY = start.y + t * dy;
+      const dist = Math.sqrt((mousePos.x - closestX) ** 2 + (mousePos.y - closestY) ** 2);
+
+      if (dist < hitRadius) {
+        const gridX = Math.round(closestX / TILE_SIZE - 0.5);
+        const gridY = Math.round(closestY / TILE_SIZE - 0.5);
+        
+        return {
+          segmentIndex: i,
+          point: { x: gridX, y: gridY },
+        };
       }
     }
     return null;
