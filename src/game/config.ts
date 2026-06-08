@@ -1,4 +1,4 @@
-import type { TowerConfig, CardConfig, EnemyConfig, WaveConfig, Position } from './types';
+import type { TowerConfig, CardConfig, EnemyConfig, WaveConfig, Position, GameMode, EnemyType } from './types';
 
 export const TILE_SIZE = 50;
 export const MAP_WIDTH = 16;
@@ -254,6 +254,12 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   },
 };
 
+export const WAVE_COUNTDOWN = 15;
+export const WAVE_REWARD_CARD_COUNT = 3;
+export const ENDLESS_MODE_BASE_DIFFICULTY = 1;
+export const ENDLESS_MODE_DIFFICULTY_GROWTH = 0.12;
+export const BOSS_WAVE_INTERVAL = 5;
+
 export const WAVE_CONFIGS: WaveConfig[] = [
   { enemies: [{ type: 'normal', count: 5, interval: 1.5 }] },
   { enemies: [{ type: 'normal', count: 8, interval: 1.2 }] },
@@ -266,6 +272,62 @@ export const WAVE_CONFIGS: WaveConfig[] = [
   { enemies: [{ type: 'fast', count: 10, interval: 0.5 }, { type: 'tank', count: 3, interval: 2.0 }] },
   { enemies: [{ type: 'normal', count: 8, interval: 0.8 }, { type: 'tank', count: 4, interval: 1.5 }, { type: 'boss', count: 1, interval: 5 }] },
 ];
+
+export function generateEndlessWave(waveNumber: number): WaveConfig {
+  const difficulty = ENDLESS_MODE_BASE_DIFFICULTY + (waveNumber - 1) * ENDLESS_MODE_DIFFICULTY_GROWTH;
+  const isBossWave = waveNumber % BOSS_WAVE_INTERVAL === 0;
+
+  const enemies: { type: EnemyType; count: number; interval: number }[] = [];
+
+  const normalCount = Math.floor(5 + waveNumber * 0.8);
+  const fastCount = Math.floor(Math.max(0, waveNumber - 2) * 0.6);
+  const tankCount = Math.floor(Math.max(0, waveNumber - 4) * 0.3);
+
+  if (normalCount > 0) {
+    enemies.push({
+      type: 'normal',
+      count: Math.floor(normalCount * difficulty),
+      interval: Math.max(0.4, 1.5 - waveNumber * 0.05),
+    });
+  }
+
+  if (fastCount > 0) {
+    enemies.push({
+      type: 'fast',
+      count: Math.floor(fastCount * difficulty),
+      interval: Math.max(0.3, 0.8 - waveNumber * 0.03),
+    });
+  }
+
+  if (tankCount > 0) {
+    enemies.push({
+      type: 'tank',
+      count: Math.floor(tankCount * difficulty),
+      interval: Math.max(1.0, 2.5 - waveNumber * 0.08),
+    });
+  }
+
+  if (isBossWave) {
+    const bossCount = Math.floor(1 + Math.floor(waveNumber / BOSS_WAVE_INTERVAL) * 0.5);
+    enemies.push({
+      type: 'boss',
+      count: bossCount,
+      interval: 4,
+    });
+  }
+
+  return { enemies };
+}
+
+export function getWaveConfig(waveNumber: number, gameMode: GameMode, levelWaves?: WaveConfig[]): WaveConfig {
+  if (gameMode === 'normal') {
+    const waves = levelWaves || WAVE_CONFIGS;
+    const index = Math.min(waveNumber - 1, waves.length - 1);
+    return waves[index];
+  } else {
+    return generateEndlessWave(waveNumber);
+  }
+}
 
 export const PATH: Position[] = [
   { x: -1, y: 4 },

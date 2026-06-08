@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   GameState,
   GameStatus,
+  GameMode,
   Tower,
   Enemy,
   Projectile,
@@ -14,12 +15,14 @@ import type {
   BattleLogType,
   BattleLogEntry,
   LevelData,
+  WaveConfig,
 } from './types';
 import {
   TOWER_CONFIGS,
   CARD_CONFIGS,
   ENEMY_CONFIGS,
   WAVE_CONFIGS,
+  RARITY_WEIGHTS,
   PATH,
   BUILDABLE_POSITIONS,
   INITIAL_GOLD,
@@ -30,16 +33,19 @@ import {
   MANA_REGEN_RATE,
   TILE_SIZE,
   MAX_BATTLE_LOGS,
+  WAVE_COUNTDOWN,
+  WAVE_REWARD_CARD_COUNT,
   generateRandomDeck,
   shuffleDeck,
   getTowerLevelConfig,
+  getWaveConfig,
 } from './config';
 import { getDefaultLevel } from './levelEditor';
 
 let idCounter = 0;
 const generateId = () => `id_${++idCounter}`;
 
-function createInitialState(level?: LevelData): GameState {
+function createInitialState(level?: LevelData, gameMode: GameMode = 'normal'): GameState {
   idCounter = 0;
   const deckCardTypes = generateRandomDeck();
   const deck: Card[] = shuffleDeck(
@@ -60,15 +66,18 @@ function createInitialState(level?: LevelData): GameState {
   }
 
   const currentLevel = level || getDefaultLevel();
+  const maxWaves = gameMode === 'endless' ? 999 : currentLevel.waves.length;
+  const nextWaveConfig = getWaveConfig(1, gameMode, currentLevel.waves);
 
   return {
     status: 'idle',
+    gameMode,
     gold: currentLevel.initialGold,
     mana: INITIAL_MANA,
     maxMana: MAX_MANA,
     lives: currentLevel.initialLives,
     wave: 0,
-    maxWaves: currentLevel.waves.length,
+    maxWaves,
     towers: [],
     enemies: [],
     projectiles: [],
@@ -94,6 +103,11 @@ function createInitialState(level?: LevelData): GameState {
     gameTime: 0,
     battleLogs: [],
     currentLevelId: currentLevel.id,
+    waveCountdown: WAVE_COUNTDOWN,
+    isCountdownActive: false,
+    nextWaveConfig,
+    waveRewardCards: [],
+    autoStartWave: false,
   };
 }
 
@@ -189,10 +203,16 @@ interface GameStore extends GameState {
   tick: (deltaTime: number) => void;
   addBattleLog: (type: BattleLogType, message: string) => void;
   setLevel: (level: LevelData) => void;
+  setGameMode: (mode: GameMode) => void;
+  toggleAutoStart: () => void;
+  skipCountdown: () => void;
+  collectWaveReward: (cardId: string) => void;
+  skipWaveReward: () => void;
   getPath: () => Position[];
   getBuildablePositions: () => Position[];
   getWaves: () => { enemies: { type: EnemyType; count: number; interval: number }[] }[];
   getInitialLives: () => number;
+  generateWaveRewardCards: () => Card[];
 }
 
 const CUSTOM_LEVELS_KEY = 'td_custom_levels';
@@ -234,6 +254,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   restartGame: () => {
     const levelId = get().currentLevelId;
+    const gameMode = get().gameMode;
     let level: LevelData | undefined;
     
     if (levelId === 'default') {
@@ -247,7 +268,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
     
-    set(createInitialState(level));
+    set(createInitialState(level, gameMode));
+  },
+
+  setGameMode: (mode) => {
+    const state = get();
+    if (state.status !== 'idle') return;
+    
+    const levelId = state.currentLevelId;
+    let level: LevelData | undefined;
+    
+    if (levelId === 'default') {
+      level = getDefaultLevel();
+    } else {
+      const storedLevel = loadLevelFromStorage(levelId);
+      if (storedLevel) {
+        level = storedLevel;
+      } else {
+        level = getDefaultLevel();
+      }
+    }
+    
+    set(createInitialState(level, mode));
+  },
+
+  toggleAutoStart: () => {
+    set({ autoStartWave: !get().autoStartWave });
   },
 
   selectTowerType: (type) => {
@@ -629,15 +675,72 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ deck, hand, discardPile });
   },
 
+  generateWaveRewardCards: () => {
+    const state = get();
+    const wave = state.wave;
+    
+    const rewardCards: Card[] = [];
+    const cardCount = WAVE_REWARD_CARD_COUNT;
+    
+    const rarityBonus = Math.floor(wave / 5) * 0.05;
+    const adjustedWeights = {
+      common: Math.max(20, RARITY_WEIGHTS.common - rarityBonus * 50),
+      rare: RARITY_WEIGHTS.rare + rarityBonus * 20,
+      epic: RARITY_WEIGHTS.epic + rarityBonus * 20,
+      legendary: RARITY_WEIGHTS.legendary + rarityBonus * 10,
+    };
+    
+    const totalWeight = Object.values(adjustedWeights).reduce((sum, w) => sum + w, 0);
+    
+    const rarityCards: Record<string, string[]> = {};
+    Object.entries(CARD_CONFIGS).forEach(([type, config]) => {
+      if (!rarityCards[config.rarity]) {
+        rarityCards[config.rarity] = [];
+      }
+      rarityCards[config.rarity].push(type);
+    });
+    
+    for (let i = 0; i < cardCount; i++) {
+      const roll = Math.random() * totalWeight;
+      let cumulative = 0;
+      let selectedRarity = 'common';
+      
+      for (const [rarity, weight] of Object.entries(adjustedWeights)) {
+        cumulative += weight;
+        if (roll <= cumulative) {
+          selectedRarity = rarity;
+          break;
+        }
+      }
+      
+      const cardsOfRarity = rarityCards[selectedRarity] || rarityCards['common'];
+      const randomIndex = Math.floor(Math.random() * cardsOfRarity.length);
+      const cardType = cardsOfRarity[randomIndex];
+      const config = CARD_CONFIGS[cardType];
+      
+      rewardCards.push({
+        id: generateId(),
+        type: cardType as CardType,
+        name: config.name,
+        description: config.description,
+        manaCost: config.manaCost,
+        icon: config.icon,
+        rarity: config.rarity,
+      });
+    }
+    
+    return rewardCards;
+  },
+
   startWave: () => {
     const state = get();
-    const { wave, waveInProgress, maxWaves, status } = state;
-    const waves = get().getWaves();
+    const { wave, waveInProgress, maxWaves, status, gameMode, isCountdownActive } = state;
 
     if (waveInProgress || status !== 'playing') return;
     if (wave >= maxWaves) return;
 
-    const waveConfig = waves[wave];
+    const waves = get().getWaves();
+    const waveConfig = getWaveConfig(wave + 1, gameMode, waves);
     const spawnQueue: { type: EnemyType; spawnTime: number }[] = [];
     let totalTime = 0;
 
@@ -652,6 +755,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     const totalEnemies = spawnQueue.length;
+    const nextWave = wave + 2;
+    let nextWaveConfig: WaveConfig | null = null;
+    if (nextWave <= maxWaves || gameMode === 'endless') {
+      nextWaveConfig = getWaveConfig(nextWave, gameMode, waves);
+    }
 
     set({
       wave: wave + 1,
@@ -660,18 +768,75 @@ export const useGameStore = create<GameStore>((set, get) => ({
       enemiesSpawned: 0,
       totalEnemiesInWave: totalEnemies,
       waveTime: 0,
+      isCountdownActive: false,
+      waveCountdown: WAVE_COUNTDOWN,
+      nextWaveConfig,
     });
 
     get().drawCards(2);
     get().addBattleLog('wave', `第 ${wave + 1} 波敌人来袭！`);
   },
 
+  skipCountdown: () => {
+    const state = get();
+    if (!state.isCountdownActive || state.status !== 'playing') return;
+    get().startWave();
+  },
+
+  collectWaveReward: (cardId) => {
+    const state = get();
+    if (state.status !== 'wave_reward') return;
+    
+    const card = state.waveRewardCards.find(c => c.id === cardId);
+    if (!card) return;
+    
+    let newDeck = [...state.deck, card];
+    newDeck = shuffleDeck(newDeck);
+    
+    const remainingCards = state.waveRewardCards.filter(c => c.id !== cardId);
+    const newDiscardPile = [...state.discardPile, ...remainingCards];
+    
+    set({
+      status: 'playing',
+      waveRewardCards: [],
+      deck: newDeck,
+      discardPile: newDiscardPile,
+      isCountdownActive: state.autoStartWave,
+      waveCountdown: WAVE_COUNTDOWN,
+    });
+    
+    get().addBattleLog('card', `获得了 ${card.name}！`);
+    
+    if (state.autoStartWave) {
+      get().addBattleLog('info', '自动开始下一波倒计时...');
+    }
+  },
+
+  skipWaveReward: () => {
+    const state = get();
+    if (state.status !== 'wave_reward') return;
+    
+    const newDiscardPile = [...state.discardPile, ...state.waveRewardCards];
+    
+    set({
+      status: 'playing',
+      waveRewardCards: [],
+      discardPile: newDiscardPile,
+      isCountdownActive: state.autoStartWave,
+      waveCountdown: WAVE_COUNTDOWN,
+    });
+    
+    if (state.autoStartWave) {
+      get().addBattleLog('info', '自动开始下一波倒计时...');
+    }
+  },
+
   tick: (deltaTime) => {
     const state = get();
-    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, divineShield, divineShieldDuration, timeWarpDuration, timeWarpScale, gameTime } = state;
+    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, divineShield, divineShieldDuration, timeWarpDuration, timeWarpScale, gameTime, isCountdownActive, waveCountdown, gameMode, autoStartWave } = state;
     const path = get().getPath();
 
-    if (status !== 'playing') return;
+    if (status !== 'playing' && status !== 'wave_reward') return;
 
     const newGameTime = gameTime + deltaTime;
     let newWaveTime = waveTime;
@@ -692,6 +857,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let newDivineShieldDuration = divineShieldDuration;
     let newTimeWarpDuration = timeWarpDuration;
     let newTimeWarpScale = timeWarpScale;
+
+    let newIsCountdownActive = isCountdownActive;
+    let newWaveCountdown = waveCountdown;
+    let newStatus: GameStatus = status;
 
     if (towerBoostDuration > 0) {
       newTowerBoostDuration -= deltaTime;
@@ -719,8 +888,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     let remainingQueue = [...spawnQueue];
     let spawnedCount = enemiesSpawned;
+    let waveComplete = false;
+    let waveInProgressFlag = waveInProgress;
 
-    if (waveInProgress) {
+    if (status === 'playing' && waveInProgress) {
       newWaveTime = waveTime + deltaTime;
 
       if (spawnQueue.length > 0) {
@@ -794,8 +965,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       newEnemies = newEnemies.filter((e) => e.health > 0);
-
-      const waveComplete = remainingQueue.length === 0 && newEnemies.length === 0;
 
       newTowers.forEach((tower) => {
         const towerConfig = TOWER_CONFIGS[tower.type];
@@ -962,63 +1131,63 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       });
 
-      let newStatus: GameStatus = status;
+      waveComplete = remainingQueue.length === 0 && newEnemies.length === 0;
+
       if (newLives <= 0) {
         newStatus = 'lost';
         get().addBattleLog('warning', '游戏失败！生命值耗尽...');
-      } else if (waveComplete && wave >= maxWaves) {
+      } else if (waveComplete && wave >= maxWaves && gameMode === 'normal') {
         newStatus = 'won';
         get().addBattleLog('info', '🎉 恭喜通关！所有波次已清除！');
       } else if (waveComplete) {
         get().addBattleLog('info', `第 ${wave} 波完成！`);
+        const rewardCards = get().generateWaveRewardCards();
+        newStatus = 'wave_reward';
+        set({
+          waveRewardCards: rewardCards,
+        });
+        get().addBattleLog('info', '选择一张卡牌作为奖励！');
       }
-
-      newEffects = newEffects
-        .map((e) => ({ ...e, duration: e.duration - deltaTime }))
-        .filter((e) => e.duration > 0);
-
-      set({
-        enemies: newEnemies,
-        projectiles: newProjectiles,
-        effects: newEffects,
-        towers: newTowers,
-        mana: newMana,
-        lives: newLives,
-        gold: newGold,
-        score: newScore,
-        waveTime: newWaveTime,
-        spawnQueue: remainingQueue,
-        enemiesSpawned: spawnedCount,
-        waveInProgress: !waveComplete,
-        status: newStatus,
-        towerBoostDuration: newTowerBoostDuration,
-        towerBoostMultiplier: newTowerBoostMultiplier,
-        divineShield: newDivineShield,
-        divineShieldDuration: newDivineShieldDuration,
-        timeWarpDuration: newTimeWarpDuration,
-        timeWarpScale: newTimeWarpScale,
-        gameTime: newGameTime,
-      });
-    } else {
-      newEffects = newEffects
-        .map((e) => ({ ...e, duration: e.duration - deltaTime }))
-        .filter((e) => e.duration > 0);
-
-      set({
-        effects: newEffects,
-        mana: newMana,
-        lives: newLives,
-        gold: newGold,
-        score: newScore,
-        towerBoostDuration: newTowerBoostDuration,
-        towerBoostMultiplier: newTowerBoostMultiplier,
-        divineShield: newDivineShield,
-        divineShieldDuration: newDivineShieldDuration,
-        timeWarpDuration: newTimeWarpDuration,
-        timeWarpScale: newTimeWarpScale,
-        gameTime: newGameTime,
-      });
     }
+
+    if (newStatus === 'playing' && !waveInProgress && !waveComplete) {
+      if (newIsCountdownActive) {
+        newWaveCountdown -= deltaTime;
+        if (newWaveCountdown <= 0) {
+          get().startWave();
+          return;
+        }
+      }
+    }
+
+    newEffects = newEffects
+      .map((e) => ({ ...e, duration: e.duration - deltaTime }))
+      .filter((e) => e.duration > 0);
+
+    set({
+      enemies: newEnemies,
+      projectiles: newProjectiles,
+      effects: newEffects,
+      towers: newTowers,
+      mana: newMana,
+      lives: newLives,
+      gold: newGold,
+      score: newScore,
+      waveTime: newWaveTime,
+      spawnQueue: remainingQueue,
+      enemiesSpawned: spawnedCount,
+      waveInProgress: waveInProgress && !waveComplete,
+      status: newStatus,
+      towerBoostDuration: newTowerBoostDuration,
+      towerBoostMultiplier: newTowerBoostMultiplier,
+      divineShield: newDivineShield,
+      divineShieldDuration: newDivineShieldDuration,
+      timeWarpDuration: newTimeWarpDuration,
+      timeWarpScale: newTimeWarpScale,
+      gameTime: newGameTime,
+      waveCountdown: newWaveCountdown,
+      isCountdownActive: newIsCountdownActive,
+    });
   },
 
   addBattleLog: (type, message) => {
@@ -1034,7 +1203,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   setLevel: (level) => {
-    set(createInitialState(level));
+    const gameMode = get().gameMode;
+    set(createInitialState(level, gameMode));
   },
 
   getPath: () => {

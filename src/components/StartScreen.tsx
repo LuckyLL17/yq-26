@@ -5,7 +5,7 @@ import LevelSelect from './LevelSelect';
 import { useNavigate } from 'react-router-dom';
 
 export default function StartScreen() {
-  const { startGame, status } = useGameStore();
+  const { startGame, status, gameMode, setGameMode } = useGameStore();
   const [particles, setParticles] = useState<{ x: number; y: number; delay: number }[]>([]);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
   const navigate = useNavigate();
@@ -81,6 +81,29 @@ export default function StartScreen() {
               {icon}
             </div>
           ))}
+        </div>
+
+        <div className="flex justify-center gap-4 mb-8">
+          <button
+            onClick={() => setGameMode('normal')}
+            className={`px-6 py-3 rounded-full font-bold transition-all duration-300 ${
+              gameMode === 'normal'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/40 scale-105'
+                : 'bg-game-panel/80 text-gray-400 hover:bg-game-panel hover:text-white border border-game-magic/30'
+            }`}
+          >
+            🎯 普通模式
+          </button>
+          <button
+            onClick={() => setGameMode('endless')}
+            className={`px-6 py-3 rounded-full font-bold transition-all duration-300 ${
+              gameMode === 'endless'
+                ? 'bg-red-600 text-white shadow-lg shadow-red-500/40 scale-105'
+                : 'bg-game-panel/80 text-gray-400 hover:bg-game-panel hover:text-white border border-game-magic/30'
+            }`}
+          >
+            ♾️ 无尽模式
+          </button>
         </div>
 
         <button

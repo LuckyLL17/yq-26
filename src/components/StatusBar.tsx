@@ -1,10 +1,25 @@
 import { useGameStore } from '@/game/store';
-import { Heart, Coins, Zap, Trophy, Layers } from 'lucide-react';
+import { ENEMY_CONFIGS } from '@/game/config';
+import { Heart, Coins, Zap, Trophy, Layers, Clock } from 'lucide-react';
 
 export default function StatusBar() {
-  const { lives, gold, mana, maxMana, wave, maxWaves, score, waveInProgress } = useGameStore();
+  const {
+    lives,
+    gold,
+    mana,
+    maxMana,
+    wave,
+    maxWaves,
+    score,
+    waveInProgress,
+    isCountdownActive,
+    waveCountdown,
+    nextWaveConfig,
+    gameMode,
+  } = useGameStore();
 
   const manaPercent = (mana / maxMana) * 100;
+  const displayMaxWaves = gameMode === 'endless' ? '∞' : maxWaves;
 
   return (
     <div className="flex items-center justify-between bg-game-panel/90 backdrop-blur-sm rounded-xl p-4 border border-game-magic/30 shadow-lg">
@@ -32,15 +47,53 @@ export default function StatusBar() {
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-purple-400" />
-          <span className="text-white">
-            第 <span className="text-purple-400 font-bold">{wave}</span> / {maxWaves} 波
-          </span>
-          {waveInProgress && (
-            <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full animate-pulse">
-              进行中
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-purple-400" />
+            <span className="text-white">
+              第 <span className="text-purple-400 font-bold">{wave}</span> / {displayMaxWaves} 波
             </span>
+            {waveInProgress && (
+              <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full animate-pulse">
+                进行中
+              </span>
+            )}
+            {gameMode === 'endless' && (
+              <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full">
+                无尽模式
+              </span>
+            )}
+          </div>
+
+          {!waveInProgress && isCountdownActive && (
+            <div className="flex items-center gap-1 text-sm text-yellow-400">
+              <Clock className="w-4 h-4" />
+              <span>下一波: {Math.ceil(waveCountdown)}秒</span>
+            </div>
+          )}
+
+          {!waveInProgress && nextWaveConfig && (
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>下一波:</span>
+              <div className="flex items-center gap-2">
+                {nextWaveConfig.enemies.map((enemy, idx) => {
+                  const config = ENEMY_CONFIGS[enemy.type];
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1"
+                      title={`${config.name} x${enemy.count}`}
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: config.color }}
+                      />
+                      <span className="text-gray-300">x{enemy.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
 

@@ -17,7 +17,9 @@ export type CardType =
 
 export type CardRarity = 'common' | 'rare' | 'epic' | 'legendary';
 
-export type GameStatus = 'idle' | 'playing' | 'paused' | 'won' | 'lost';
+export type GameStatus = 'idle' | 'playing' | 'paused' | 'won' | 'lost' | 'wave_reward';
+
+export type GameMode = 'normal' | 'endless';
 
 export interface Position {
   x: number;
@@ -167,6 +169,7 @@ export interface EnemyConfig {
 
 export interface GameState {
   status: GameStatus;
+  gameMode: GameMode;
   gold: number;
   mana: number;
   maxMana: number;
@@ -198,6 +201,11 @@ export interface GameState {
   gameTime: number;
   battleLogs: BattleLogEntry[];
   currentLevelId: string;
+  waveCountdown: number;
+  isCountdownActive: boolean;
+  nextWaveConfig: WaveConfig | null;
+  waveRewardCards: Card[];
+  autoStartWave: boolean;
 }
 
 export type BattleLogType =
@@ -233,7 +241,12 @@ export type GameAction =
   | { type: 'START_WAVE' }
   | { type: 'TICK'; deltaTime: number }
   | { type: 'ADD_EFFECT'; effect: Effect }
-  | { type: 'SET_LEVEL'; level: LevelData };
+  | { type: 'SET_LEVEL'; level: LevelData }
+  | { type: 'SET_GAME_MODE'; mode: GameMode }
+  | { type: 'TOGGLE_AUTO_START' }
+  | { type: 'SKIP_COUNTDOWN' }
+  | { type: 'COLLECT_WAVE_REWARD'; cardId: string }
+  | { type: 'SKIP_WAVE_REWARD' };
 
 export interface LevelData {
   id: string;

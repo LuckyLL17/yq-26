@@ -6,6 +6,7 @@ import CardHand from '@/components/CardHand';
 import GameControls from '@/components/GameControls';
 import StartScreen from '@/components/StartScreen';
 import GameOverModal from '@/components/GameOverModal';
+import WaveRewardModal from '@/components/WaveRewardModal';
 import BattleLog from '@/components/BattleLog';
 import { useGameStore } from '@/game/store';
 
@@ -16,6 +17,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-game-bg via-game-panel to-game-bg">
       <StartScreen />
       <GameOverModal />
+      <WaveRewardModal />
 
       {status !== 'idle' && (
         <div className="container mx-auto px-4 py-6 max-w-7xl">

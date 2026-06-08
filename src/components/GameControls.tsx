@@ -1,5 +1,5 @@
 import { useGameStore } from '@/game/store';
-import { Play, Pause, SkipForward, RotateCcw } from 'lucide-react';
+import { Play, Pause, SkipForward, RotateCcw, Zap, FastForward } from 'lucide-react';
 
 export default function GameControls() {
   const {
@@ -7,14 +7,21 @@ export default function GameControls() {
     waveInProgress,
     wave,
     maxWaves,
+    gameMode,
+    autoStartWave,
+    isCountdownActive,
     startGame,
     pauseGame,
     resumeGame,
     restartGame,
     startWave,
+    setGameMode,
+    toggleAutoStart,
+    skipCountdown,
   } = useGameStore();
 
   const canStartWave = !waveInProgress && wave < maxWaves && status === 'playing';
+  const displayMaxWaves = gameMode === 'endless' ? '∞' : maxWaves;
 
   return (
     <div className="bg-game-panel/90 backdrop-blur-sm rounded-xl p-4 border border-game-magic/30 shadow-lg">
@@ -24,13 +31,41 @@ export default function GameControls() {
 
       <div className="space-y-2">
         {status === 'idle' && (
-          <button
-            onClick={startGame}
-            className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105"
-          >
-            <Play className="w-5 h-5" />
-            开始游戏
-          </button>
+          <>
+            <div className="mb-3">
+              <p className="text-sm text-gray-400 mb-2">选择游戏模式:</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setGameMode('normal')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200 ${
+                    gameMode === 'normal'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                  }`}
+                >
+                  普通模式
+                </button>
+                <button
+                  onClick={() => setGameMode('endless')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all duration-200 ${
+                    gameMode === 'endless'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                  }`}
+                >
+                  无尽模式
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={startGame}
+              className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30 hover:shadow-green-500/50 hover:scale-105"
+            >
+              <Play className="w-5 h-5" />
+              开始游戏
+            </button>
+          </>
         )}
 
         {status === 'playing' && (
@@ -55,20 +90,46 @@ export default function GameControls() {
 
         {(status === 'playing' || status === 'paused') && (
           <>
-            <button
-              onClick={startWave}
-              disabled={!canStartWave}
-              className={`
-                w-full py-3 px-4 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2
-                ${canStartWave
-                  ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105'
-                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                }
-              `}
-            >
-              <SkipForward className="w-5 h-5" />
-              {waveInProgress ? '战斗进行中...' : `开始第 ${wave + 1} 波`}
-            </button>
+            <div className="flex items-center justify-between py-2 px-3 bg-game-panel-light/50 rounded-lg">
+              <span className="text-sm text-gray-300">自动开始下一波</span>
+              <button
+                onClick={toggleAutoStart}
+                className={`w-12 h-6 rounded-full transition-all duration-200 ${
+                  autoStartWave ? 'bg-green-500' : 'bg-gray-600'
+                }`}
+              >
+                <div
+                  className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+                    autoStartWave ? 'translate-x-6' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {isCountdownActive ? (
+              <button
+                onClick={skipCountdown}
+                className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-yellow-600 to-orange-500 hover:from-yellow-500 hover:to-orange-400 text-white font-bold transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50 hover:scale-105"
+              >
+                <FastForward className="w-5 h-5" />
+                立即开始
+              </button>
+            ) : (
+              <button
+                onClick={startWave}
+                disabled={!canStartWave}
+                className={`
+                  w-full py-3 px-4 rounded-lg font-bold transition-all duration-200 flex items-center justify-center gap-2
+                  ${canStartWave
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105'
+                    : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                  }
+                `}
+              >
+                <SkipForward className="w-5 h-5" />
+                {waveInProgress ? '战斗进行中...' : `开始第 ${wave + 1} 波`}
+              </button>
+            )}
 
             <button
               onClick={restartGame}
@@ -98,6 +159,7 @@ export default function GameControls() {
           <li>• 选择卡牌后点击目标释放技能</li>
           <li>• 部分卡牌需要选择目标位置</li>
           <li>• 击败敌人获得金币和分数</li>
+          <li>• 每波结束可选择一张奖励卡牌</li>
         </ul>
       </div>
     </div>
