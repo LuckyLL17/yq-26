@@ -668,7 +668,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   tick: (deltaTime) => {
     const state = get();
-    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, gameTime } = state;
+    const { status, waveInProgress, enemies, towers, projectiles, effects, mana, maxMana, lives, score, wave, maxWaves, spawnQueue, waveTime, enemiesSpawned, towerBoostDuration, towerBoostMultiplier, divineShield, divineShieldDuration, timeWarpDuration, timeWarpScale, gameTime } = state;
     const path = get().getPath();
 
     if (status !== 'playing') return;
