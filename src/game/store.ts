@@ -235,7 +235,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   currentLevelId: 'default',
 
   startGame: () => {
-    set({ status: 'playing' });
+    const { autoStartWave } = get();
+    set({ 
+      status: 'playing',
+      isCountdownActive: autoStartWave,
+    });
+    if (autoStartWave) {
+      get().addBattleLog('info', '自动开始倒计时...');
+    }
   },
 
   pauseGame: () => {
@@ -796,6 +803,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const remainingCards = state.waveRewardCards.filter(c => c.id !== cardId);
     const newDiscardPile = [...state.discardPile, ...remainingCards];
     
+    const nextWaveNum = state.wave + 1;
+    const waves = get().getWaves();
+    let nextWaveConfig: WaveConfig | null = null;
+    if (nextWaveNum <= state.maxWaves || state.gameMode === 'endless') {
+      nextWaveConfig = getWaveConfig(nextWaveNum, state.gameMode, waves);
+    }
+    
     set({
       status: 'playing',
       waveRewardCards: [],
@@ -803,6 +817,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       discardPile: newDiscardPile,
       isCountdownActive: state.autoStartWave,
       waveCountdown: WAVE_COUNTDOWN,
+      nextWaveConfig,
     });
     
     get().addBattleLog('card', `获得了 ${card.name}！`);
@@ -818,12 +833,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     const newDiscardPile = [...state.discardPile, ...state.waveRewardCards];
     
+    const nextWaveNum = state.wave + 1;
+    const waves = get().getWaves();
+    let nextWaveConfig: WaveConfig | null = null;
+    if (nextWaveNum <= state.maxWaves || state.gameMode === 'endless') {
+      nextWaveConfig = getWaveConfig(nextWaveNum, state.gameMode, waves);
+    }
+    
     set({
       status: 'playing',
       waveRewardCards: [],
       discardPile: newDiscardPile,
       isCountdownActive: state.autoStartWave,
       waveCountdown: WAVE_COUNTDOWN,
+      nextWaveConfig,
     });
     
     if (state.autoStartWave) {
@@ -1150,13 +1173,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    if (newStatus === 'playing' && !waveInProgress && !waveComplete) {
-      if (newIsCountdownActive) {
-        newWaveCountdown -= deltaTime;
-        if (newWaveCountdown <= 0) {
-          get().startWave();
-          return;
-        }
+    const waveIsNotActive = !waveInProgress && !waveComplete;
+    if (newStatus === 'playing' && waveIsNotActive && newIsCountdownActive) {
+      newWaveCountdown -= deltaTime;
+      if (newWaveCountdown <= 0) {
+        get().startWave();
+        return;
       }
     }
 
