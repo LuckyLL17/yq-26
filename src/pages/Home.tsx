@@ -9,18 +9,61 @@ import GameOverModal from '@/components/GameOverModal';
 import WaveRewardModal from '@/components/WaveRewardModal';
 import BattleLog from '@/components/BattleLog';
 import { useGameStore } from '@/game/store';
+import { INITIAL_LIVES } from '@/game/config';
 
 export default function Home() {
-  const { status, selectedTowerId } = useGameStore();
+  const { status, selectedTowerId, lives } = useGameStore();
+  const lowHealthThreshold = INITIAL_LIVES * 0.3;
+  const isLowHealth = lives <= lowHealthThreshold && status === 'playing';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-game-bg via-game-panel to-game-bg">
+    <div className="min-h-screen bg-gradient-to-b from-game-bg via-game-panel to-game-bg relative">
       <StartScreen />
       <GameOverModal />
       <WaveRewardModal />
 
+      {isLowHealth && (
+        <div className="fixed inset-0 pointer-events-none z-50">
+          <div 
+            className="absolute inset-0"
+            style={{
+              boxShadow: 'inset 0 0 100px 30px rgba(239, 68, 68, 0.6)',
+              animation: 'pulse-red 1.5s ease-in-out infinite',
+            }}
+          />
+          <div 
+            className="absolute top-0 left-0 right-0 h-32"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(239, 68, 68, 0.5), transparent)',
+              animation: 'pulse-red 1.5s ease-in-out infinite',
+            }}
+          />
+          <div 
+            className="absolute bottom-0 left-0 right-0 h-32"
+            style={{
+              background: 'linear-gradient(to top, rgba(239, 68, 68, 0.5), transparent)',
+              animation: 'pulse-red 1.5s ease-in-out infinite',
+            }}
+          />
+          <div 
+            className="absolute top-0 bottom-0 left-0 w-32"
+            style={{
+              background: 'linear-gradient(to right, rgba(239, 68, 68, 0.5), transparent)',
+              animation: 'pulse-red 1.5s ease-in-out infinite',
+            }}
+          />
+          <div 
+            className="absolute top-0 bottom-0 right-0 w-32"
+            style={{
+              background: 'linear-gradient(to left, rgba(239, 68, 68, 0.5), transparent)',
+              animation: 'pulse-red 1.5s ease-in-out infinite',
+            }}
+          />
+        </div>
+      )}
+
       {status !== 'idle' && (
-        <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="container mx-auto px-4 py-6 max-w-7xl relative z-10">
           <div className="text-center mb-4">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               ⚔️ 魔法塔防：卡牌之战 ⚔️

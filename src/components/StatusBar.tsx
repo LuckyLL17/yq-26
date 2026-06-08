@@ -1,5 +1,6 @@
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/game/store';
-import { ENEMY_CONFIGS } from '@/game/config';
+import { ENEMY_CONFIGS, INITIAL_LIVES } from '@/game/config';
 import type { EnemyType } from '@/game/types';
 import { Heart, Coins, Zap, Trophy, Layers, Clock, Eye } from 'lucide-react';
 
@@ -20,6 +21,43 @@ export default function StatusBar() {
     status,
   } = useGameStore();
 
+  const [goldAnimating, setGoldAnimating] = useState(false);
+  const [manaAnimating, setManaAnimating] = useState(false);
+  const [livesAnimating, setLivesAnimating] = useState(false);
+  const prevGoldRef = useRef(gold);
+  const prevManaRef = useRef(mana);
+  const prevLivesRef = useRef(lives);
+
+  const lowHealthThreshold = INITIAL_LIVES * 0.3;
+  const isLowHealth = lives <= lowHealthThreshold && status === 'playing';
+
+  useEffect(() => {
+    if (prevGoldRef.current !== gold) {
+      setGoldAnimating(true);
+      const timer = setTimeout(() => setGoldAnimating(false), 500);
+      prevGoldRef.current = gold;
+      return () => clearTimeout(timer);
+    }
+  }, [gold]);
+
+  useEffect(() => {
+    if (prevManaRef.current !== mana) {
+      setManaAnimating(true);
+      const timer = setTimeout(() => setManaAnimating(false), 500);
+      prevManaRef.current = mana;
+      return () => clearTimeout(timer);
+    }
+  }, [mana]);
+
+  useEffect(() => {
+    if (prevLivesRef.current !== lives) {
+      setLivesAnimating(true);
+      const timer = setTimeout(() => setLivesAnimating(false), 500);
+      prevLivesRef.current = lives;
+      return () => clearTimeout(timer);
+    }
+  }, [lives]);
+
   const manaPercent = (mana / maxMana) * 100;
   const displayMaxWaves = gameMode === 'endless' ? '∞' : maxWaves;
   const showNextWavePreview = !waveInProgress && nextWaveConfig && status !== 'won' && status !== 'lost';
@@ -30,28 +68,53 @@ export default function StatusBar() {
     return nextWaveConfig.enemies.reduce((sum, e) => sum + e.count, 0);
   };
 
+  const livesContainerClass = `flex items-center gap-2 transition-all duration-200 ${livesAnimating ? 'scale-110' : 'scale-100'}`;
+  const heartClass = `w-6 h-6 transition-all duration-300 ${isLowHealth ? 'text-red-400 fill-red-400 animate-pulse' : 'text-red-500 fill-red-500'}`;
+  const livesTextClass = `text-xl font-bold transition-all duration-200 ${isLowHealth ? 'text-red-400 animate-pulse' : 'text-white'} ${livesAnimating ? 'scale-125' : 'scale-100'}`;
+
+  const goldContainerClass = `flex items-center gap-2 transition-all duration-200 ${goldAnimating ? 'scale-110' : 'scale-100'}`;
+  const coinsClass = `w-6 h-6 transition-all duration-300 ${goldAnimating ? 'text-yellow-300 fill-yellow-300' : 'text-yellow-400 fill-yellow-400'}`;
+  const goldTextClass = `text-xl font-bold transition-all duration-200 ${goldAnimating ? 'text-yellow-300 scale-125' : 'text-yellow-400'}`;
+  const goldTextStyle = {
+    animation: goldAnimating ? 'gold-shine 0.5s ease-in-out' : 'none',
+    textShadow: goldAnimating ? '0 0 10px rgba(250, 204, 21, 0.8)' : 'none',
+  };
+
+  const manaContainerClass = `flex items-center gap-2 transition-all duration-200 ${manaAnimating ? 'scale-105' : 'scale-100'}`;
+  const zapClass = `w-6 h-6 transition-all duration-300 ${manaAnimating ? 'text-blue-300 fill-blue-300' : 'text-blue-400 fill-blue-400'}`;
+  const manaTextClass = `text-sm font-semibold w-12 transition-all duration-200 ${manaAnimating ? 'text-blue-200' : 'text-blue-300'}`;
+  const manaTextStyle = {
+    animation: manaAnimating ? 'mana-glow 0.5s ease-in-out' : 'none',
+  };
+
   return (
-    <div className="flex items-center justify-between bg-game-panel/90 backdrop-blur-sm rounded-xl p-4 border border-game-magic/30 shadow-lg">
+    <div className="flex items-center justify-between bg-game-panel/90 backdrop-blur-sm rounded-xl p-4 border border-game-magic/30 shadow-lg transition-all duration-300">
       <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Heart className="w-6 h-6 text-red-500 fill-red-500" />
-          <span className="text-xl font-bold text-white">{lives}</span>
+        <div className={livesContainerClass}>
+          <Heart className={heartClass} />
+          <span className={livesTextClass}>
+            {lives}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Coins className="w-6 h-6 text-yellow-400 fill-yellow-400" />
-          <span className="text-xl font-bold text-yellow-400">{gold}</span>
+        <div className={goldContainerClass}>
+          <Coins className={coinsClass} />
+          <span className={goldTextClass} style={goldTextStyle}>
+            {gold}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Zap className="w-6 h-6 text-blue-400 fill-blue-400" />
+        <div className={manaContainerClass}>
+          <Zap className={zapClass} />
           <div className="w-24 h-4 bg-game-panel-light rounded-full overflow-hidden border border-blue-500/30">
             <div
               className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300"
               style={{ width: `${manaPercent}%` }}
             />
           </div>
-          <span className="text-sm text-blue-300 w-12">{Math.floor(mana)}/{maxMana}</span>
+          <span className={manaTextClass} style={manaTextStyle}>
+            {Math.floor(mana)}/{maxMana}
+          </span>
         </div>
       </div>
 

@@ -56,6 +56,57 @@ body {
   }
 }
 
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes number-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes gold-shine {
+  0% {
+    color: #fbbf24;
+    text-shadow: 0 0 5px rgba(251, 191, 36, 0.5);
+  }
+  50% {
+    color: #fde047;
+    text-shadow: 0 0 15px rgba(251, 191, 36, 0.8);
+  }
+  100% {
+    color: #fbbf24;
+    text-shadow: 0 0 5px rgba(251, 191, 36, 0.5);
+  }
+}
+
+@keyframes mana-glow {
+  0% {
+    color: #60a5fa;
+    text-shadow: 0 0 5px rgba(96, 165, 250, 0.5);
+  }
+  50% {
+    color: #93c5fd;
+    text-shadow: 0 0 15px rgba(96, 165, 250, 0.8);
+  }
+  100% {
+    color: #60a5fa;
+    text-shadow: 0 0 5px rgba(96, 165, 250, 0.5);
+  }
+}
+
 .animate-scale-in {
   animation: scale-in 0.3s ease-out;
 }
