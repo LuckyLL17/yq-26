@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/game/store';
 import { ENEMY_CONFIGS, INITIAL_LIVES } from '@/game/config';
 import type { EnemyType } from '@/game/types';
-import { Heart, Coins, Zap, Trophy, Layers, Clock, Eye } from 'lucide-react';
+import { Heart, Coins, Zap, Trophy, Layers, Clock, Eye, Settings } from 'lucide-react';
+import SettingsPanel from './SettingsPanel';
 
 export default function StatusBar() {
   const {
@@ -172,9 +173,12 @@ export default function StatusBar() {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-yellow-500" />
-        <span className="text-yellow-400 font-bold text-lg">{score}</span>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-yellow-500" />
+          <span className="text-yellow-400 font-bold text-lg">{score}</span>
+        </div>
+        <SettingsPanel />
       </div>
     </div>
   );

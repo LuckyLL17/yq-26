@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useGameStore } from '@/game/store';
+import { useSettingsStore } from '@/game/settingsStore';
 import { GameRenderer } from '@/game/renderer';
 import { TILE_SIZE, MAP_WIDTH, MAP_HEIGHT } from '@/game/config';
 import type { Position } from '@/game/types';
@@ -33,6 +34,14 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
   const canvasWidth = MAP_WIDTH * TILE_SIZE;
   const canvasHeight = MAP_HEIGHT * TILE_SIZE;
 
+  const {
+    backgroundTheme,
+    particleIntensity,
+    trailEffect,
+    glowEffect,
+    screenShake,
+  } = useSettingsStore();
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -40,7 +49,15 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    rendererRef.current = new GameRenderer(ctx, canvasWidth, canvasHeight);
+    const renderer = new GameRenderer(ctx, canvasWidth, canvasHeight);
+    renderer.setSettings({
+      backgroundTheme,
+      particleIntensity,
+      trailEffect,
+      glowEffect,
+      screenShake,
+    });
+    rendererRef.current = renderer;
 
     return () => {
       if (animationFrameRef.current) {
@@ -48,6 +65,19 @@ export default function GameCanvas({ onCardTargetSelect }: GameCanvasProps) {
       }
     };
   }, [canvasWidth, canvasHeight]);
+
+  useEffect(() => {
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    renderer.setSettings({
+      backgroundTheme,
+      particleIntensity,
+      trailEffect,
+      glowEffect,
+      screenShake,
+    });
+  }, [backgroundTheme, particleIntensity, trailEffect, glowEffect, screenShake]);
 
   const gameLoop = useCallback((timestamp: number) => {
     const renderer = rendererRef.current;

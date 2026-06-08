@@ -98,13 +98,16 @@ export interface Effect {
     | 'summon'
     | 'mana_surge'
     | 'time_warp'
-    | 'divine_shield';
+    | 'divine_shield'
+    | 'death_explosion';
   position: Position;
   duration: number;
   maxDuration: number;
   radius?: number;
   towerId?: string;
   chainTargets?: Position[];
+  enemyColor?: string;
+  enemySize?: number;
 }
 
 export interface WaveConfig {

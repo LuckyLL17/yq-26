@@ -980,6 +980,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       deadEnemies.forEach((e) => {
         newGold += e.reward;
         newScore += e.reward * 10;
+
+        const enemyConfig = ENEMY_CONFIGS[e.type];
+        newEffects.push({
+          id: generateId(),
+          type: 'death_explosion',
+          position: { ...e.position },
+          duration: 0.01,
+          maxDuration: 0.01,
+          enemyColor: enemyConfig.color,
+          enemySize: enemyConfig.size,
+        });
       });
 
       if (deadEnemies.length > 0) {

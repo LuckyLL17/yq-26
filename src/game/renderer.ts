@@ -2,12 +2,62 @@ import type { Tower, Enemy, Projectile, Effect, Position } from './types';
 import { TOWER_CONFIGS, ENEMY_CONFIGS, CARD_CONFIGS, PATH, BUILDABLE_POSITIONS, TILE_SIZE, MAP_WIDTH, MAP_HEIGHT, getTowerLevelConfig } from './config';
 import { getDefaultLevel } from './levelEditor';
 
+export type BackgroundTheme = 'night' | 'forest' | 'desert' | 'ice' | 'volcano' | 'ocean';
+
+export interface RendererSettings {
+  backgroundTheme: BackgroundTheme;
+  particleIntensity: number;
+  trailEffect: boolean;
+  glowEffect: boolean;
+  screenShake: boolean;
+}
+
+interface TrailPoint {
+  x: number;
+  y: number;
+  life: number;
+  maxLife: number;
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+  type: 'circle' | 'star' | 'spark' | 'smoke';
+  rotation?: number;
+  rotationSpeed?: number;
+}
+
+interface BgParticle {
+  x: number;
+  y: number;
+  speed: number;
+  size: number;
+  opacity: number;
+  type: 'star' | 'dust' | 'leaf' | 'snow' | 'ember';
+}
+
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private width: number;
   private height: number;
-  private particles: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number }[] = [];
-  private bgParticles: { x: number; y: number; speed: number; size: number; opacity: number }[] = [];
+  private particles: Particle[] = [];
+  private bgParticles: BgParticle[] = [];
+  private projectileTrails: Map<string, TrailPoint[]> = new Map();
+  private settings: RendererSettings = {
+    backgroundTheme: 'night',
+    particleIntensity: 1,
+    trailEffect: true,
+    glowEffect: true,
+    screenShake: true,
+  };
+  private shakeIntensity = 0;
+  private shakeDecay = 0.9;
 
   constructor(ctx: CanvasRenderingContext2D, width: number, height: number) {
     this.ctx = ctx;
@@ -16,14 +66,68 @@ export class GameRenderer {
     this.initBgParticles();
   }
 
+  setSettings(settings: Partial<RendererSettings>) {
+    this.settings = { ...this.settings, ...settings };
+    if (settings.backgroundTheme) {
+      this.reinitBgParticles();
+    }
+  }
+
+  getSettings(): RendererSettings {
+    return { ...this.settings };
+  }
+
+  addShake(intensity: number) {
+    if (this.settings.screenShake) {
+      this.shakeIntensity = Math.min(this.shakeIntensity + intensity, 20);
+    }
+  }
+
+  private reinitBgParticles() {
+    this.bgParticles = [];
+    this.initBgParticles();
+  }
+
   private initBgParticles() {
-    for (let i = 0; i < 50; i++) {
+    const theme = this.settings.backgroundTheme;
+    let count = 50;
+    let type: BgParticle['type'] = 'star';
+
+    switch (theme) {
+      case 'night':
+        count = 80;
+        type = 'star';
+        break;
+      case 'forest':
+        count = 30;
+        type = 'leaf';
+        break;
+      case 'desert':
+        count = 40;
+        type = 'dust';
+        break;
+      case 'ice':
+        count = 60;
+        type = 'snow';
+        break;
+      case 'volcano':
+        count = 45;
+        type = 'ember';
+        break;
+      case 'ocean':
+        count = 35;
+        type = 'dust';
+        break;
+    }
+
+    for (let i = 0; i < count; i++) {
       this.bgParticles.push({
         x: Math.random() * this.width,
         y: Math.random() * this.height,
         speed: 10 + Math.random() * 20,
         size: 1 + Math.random() * 2,
         opacity: 0.2 + Math.random() * 0.4,
+        type,
       });
     }
   }
@@ -37,33 +141,138 @@ export class GameRenderer {
     this.particles = this.particles.filter((p) => {
       p.x += p.vx * deltaTime;
       p.y += p.vy * deltaTime;
+      p.vy += 200 * deltaTime * (p.type === 'smoke' ? 0 : 1);
+      p.vx *= 0.98;
+      p.vy *= 0.98;
       p.life -= deltaTime;
+      if (p.rotationSpeed !== undefined) {
+        p.rotation = (p.rotation || 0) + p.rotationSpeed * deltaTime;
+      }
       return p.life > 0;
     });
 
     this.bgParticles.forEach((p) => {
-      p.y -= p.speed * deltaTime * 0.3;
-      if (p.y < -10) {
-        p.y = this.height + 10;
-        p.x = Math.random() * this.width;
+      if (p.type === 'snow' || p.type === 'ember') {
+        p.y += p.speed * deltaTime * 0.5;
+        p.x += Math.sin(p.y * 0.02) * 10 * deltaTime;
+      } else if (p.type === 'leaf') {
+        p.y += p.speed * deltaTime * 0.3;
+        p.x += Math.sin(p.y * 0.03 + p.x * 0.01) * 15 * deltaTime;
+      } else {
+        p.y -= p.speed * deltaTime * 0.3;
       }
+
+      if (p.y < -10 || p.y > this.height + 10 || p.x < -10 || p.x > this.width + 10) {
+        if (p.type === 'snow' || p.type === 'ember' || p.type === 'leaf') {
+          p.y = -10;
+          p.x = Math.random() * this.width;
+        } else {
+          p.y = this.height + 10;
+          p.x = Math.random() * this.width;
+        }
+      }
+    });
+
+    this.shakeIntensity *= this.shakeDecay;
+    if (this.shakeIntensity < 0.1) this.shakeIntensity = 0;
+  }
+
+  updateProjectileTrails(projectiles: Projectile[], deltaTime: number) {
+    if (!this.settings.trailEffect) {
+      this.projectileTrails.clear();
+      return;
+    }
+
+    const activeIds = new Set(projectiles.map(p => p.id));
+
+    for (const [id, trail] of this.projectileTrails) {
+      if (!activeIds.has(id)) {
+        this.projectileTrails.delete(id);
+        continue;
+      }
+      trail.forEach(point => {
+        point.life -= deltaTime;
+      });
+      this.projectileTrails.set(id, trail.filter(p => p.life > 0));
+    }
+
+    projectiles.forEach(proj => {
+      const trail = this.projectileTrails.get(proj.id) || [];
+      trail.push({
+        x: proj.position.x,
+        y: proj.position.y,
+        life: 0.3,
+        maxLife: 0.3,
+      });
+      if (trail.length > 15) trail.shift();
+      this.projectileTrails.set(proj.id, trail);
     });
   }
 
   addExplosionParticles(x: number, y: number, color: string, count: number = 20) {
-    for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-      const speed = 50 + Math.random() * 100;
+    const actualCount = Math.floor(count * this.settings.particleIntensity);
+    for (let i = 0; i < actualCount; i++) {
+      const angle = (Math.PI * 2 * i) / actualCount + Math.random() * 0.5;
+      const speed = 80 + Math.random() * 150;
+      const types: Particle['type'][] = ['circle', 'spark', 'star'];
+      const type = types[Math.floor(Math.random() * types.length)];
       this.particles.push({
         x,
         y,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        life: 0.5 + Math.random() * 0.5,
-        maxLife: 1,
+        vy: Math.sin(angle) * speed - 50,
+        life: 0.6 + Math.random() * 0.6,
+        maxLife: 1.2,
         color,
-        size: 3 + Math.random() * 4,
+        size: 3 + Math.random() * 5,
+        type,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 10,
       });
+    }
+  }
+
+  addDeathParticles(x: number, y: number, color: string, size: number = 15) {
+    const baseCount = Math.floor(30 * this.settings.particleIntensity);
+    this.addExplosionParticles(x, y, color, baseCount);
+
+    const smokeCount = Math.floor(8 * this.settings.particleIntensity);
+    for (let i = 0; i < smokeCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 20 + Math.random() * 40;
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * size,
+        y: y + (Math.random() - 0.5) * size * 0.5,
+        vx: Math.cos(angle) * speed,
+        vy: -30 - Math.random() * 50,
+        life: 1 + Math.random() * 0.5,
+        maxLife: 1.5,
+        color: '#4a4a4a',
+        size: 8 + Math.random() * 8,
+        type: 'smoke',
+      });
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const angle = (Math.PI * 2 * i) / 5 + Math.random() * 0.3;
+      const speed = 100 + Math.random() * 80;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 60,
+        life: 0.8 + Math.random() * 0.4,
+        maxLife: 1.2,
+        color: '#ff6b35',
+        size: 4 + Math.random() * 3,
+        type: 'spark',
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 15,
+      });
+    }
+
+    if (this.settings.screenShake) {
+      this.addShake(3);
     }
   }
 
@@ -84,21 +293,108 @@ export class GameRenderer {
     const currentBuildablePositions = buildablePositions || getDefaultLevel().buildablePositions;
 
     this.updateParticles(deltaTime);
+    this.updateProjectileTrails(projectiles, deltaTime);
+
+    const ctx = this.ctx;
+    ctx.save();
+
+    if (this.shakeIntensity > 0) {
+      const shakeX = (Math.random() - 0.5) * this.shakeIntensity;
+      const shakeY = (Math.random() - 0.5) * this.shakeIntensity;
+      ctx.translate(shakeX, shakeY);
+    }
+
     this.drawBackground();
     this.drawPath(currentPath);
     this.drawBuildablePositions(towers, selectedTowerType, currentBuildablePositions);
     this.drawTowers(towers, selectedTowerId);
     this.drawSelectedTowerRange(towers, selectedTowerId);
+    this.drawProjectileTrails(projectiles);
     this.drawEnemies(enemies);
     this.drawProjectiles(projectiles);
     this.drawEffects(effects);
     this.drawParticles();
     this.drawLevelUpTexts(effects);
     this.drawSelectionIndicator(selectedTowerType, selectedCardType, mousePosition, towers, currentBuildablePositions);
+
+    ctx.restore();
+  }
+
+  private getThemeColors() {
+    const themes = {
+      night: {
+        bgInner: '#1a1a2e',
+        bgOuter: '#0a0a1a',
+        gridColor: 'rgba(124, 58, 237, 0.1)',
+        particleColor: 'rgba(167, 139, 250, ',
+        buildableFill: 'rgba(124, 58, 237, 0.1)',
+        buildableStroke: 'rgba(124, 58, 237, 0.3)',
+        pathOuter: 'rgba(139, 69, 19, 0.6)',
+        pathInner: 'rgba(160, 82, 45, 0.8)',
+        pathDash: 'rgba(210, 180, 140, 0.4)',
+      },
+      forest: {
+        bgInner: '#1a3a1a',
+        bgOuter: '#0a1f0a',
+        gridColor: 'rgba(34, 197, 94, 0.08)',
+        particleColor: 'rgba(134, 239, 172, ',
+        buildableFill: 'rgba(34, 197, 94, 0.1)',
+        buildableStroke: 'rgba(34, 197, 94, 0.3)',
+        pathOuter: 'rgba(101, 67, 33, 0.6)',
+        pathInner: 'rgba(139, 90, 43, 0.8)',
+        pathDash: 'rgba(189, 159, 109, 0.4)',
+      },
+      desert: {
+        bgInner: '#3d2f1f',
+        bgOuter: '#1f1810',
+        gridColor: 'rgba(245, 158, 11, 0.1)',
+        particleColor: 'rgba(253, 224, 171, ',
+        buildableFill: 'rgba(245, 158, 11, 0.1)',
+        buildableStroke: 'rgba(245, 158, 11, 0.3)',
+        pathOuter: 'rgba(146, 64, 14, 0.6)',
+        pathInner: 'rgba(180, 83, 9, 0.8)',
+        pathDash: 'rgba(252, 211, 77, 0.4)',
+      },
+      ice: {
+        bgInner: '#1a2a3a',
+        bgOuter: '#0a1520',
+        gridColor: 'rgba(56, 189, 248, 0.1)',
+        particleColor: 'rgba(186, 230, 253, ',
+        buildableFill: 'rgba(56, 189, 248, 0.1)',
+        buildableStroke: 'rgba(56, 189, 248, 0.3)',
+        pathOuter: 'rgba(14, 116, 144, 0.6)',
+        pathInner: 'rgba(6, 182, 212, 0.6)',
+        pathDash: 'rgba(165, 243, 252, 0.4)',
+      },
+      volcano: {
+        bgInner: '#2a1515',
+        bgOuter: '#150a0a',
+        gridColor: 'rgba(239, 68, 68, 0.1)',
+        particleColor: 'rgba(252, 165, 165, ',
+        buildableFill: 'rgba(239, 68, 68, 0.1)',
+        buildableStroke: 'rgba(239, 68, 68, 0.3)',
+        pathOuter: 'rgba(127, 29, 29, 0.6)',
+        pathInner: 'rgba(185, 28, 28, 0.7)',
+        pathDash: 'rgba(252, 165, 165, 0.4)',
+      },
+      ocean: {
+        bgInner: '#0f2a3a',
+        bgOuter: '#051520',
+        gridColor: 'rgba(14, 165, 233, 0.1)',
+        particleColor: 'rgba(125, 211, 252, ',
+        buildableFill: 'rgba(14, 165, 233, 0.1)',
+        buildableStroke: 'rgba(14, 165, 233, 0.3)',
+        pathOuter: 'rgba(7, 89, 133, 0.6)',
+        pathInner: 'rgba(3, 105, 161, 0.7)',
+        pathDash: 'rgba(125, 211, 252, 0.4)',
+      },
+    };
+    return themes[this.settings.backgroundTheme] || themes.night;
   }
 
   private drawBackground() {
     const ctx = this.ctx;
+    const colors = this.getThemeColors();
 
     const gradient = ctx.createRadialGradient(
       this.width / 2,
@@ -108,13 +404,13 @@ export class GameRenderer {
       this.height / 2,
       this.width * 0.7
     );
-    gradient.addColorStop(0, '#1a1a2e');
-    gradient.addColorStop(1, '#0a0a1a');
+    gradient.addColorStop(0, colors.bgInner);
+    gradient.addColorStop(1, colors.bgOuter);
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    ctx.strokeStyle = 'rgba(124, 58, 237, 0.1)';
+    ctx.strokeStyle = colors.gridColor;
     ctx.lineWidth = 1;
 
     for (let x = 0; x <= MAP_WIDTH; x++) {
@@ -132,15 +428,85 @@ export class GameRenderer {
     }
 
     this.bgParticles.forEach((p) => {
+      const alpha = p.opacity;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(167, 139, 250, ${p.opacity})`;
-      ctx.fill();
+
+      if (p.type === 'star') {
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = colors.particleColor + alpha + ')';
+        ctx.fill();
+      } else if (p.type === 'leaf') {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.y * 0.02);
+        ctx.fillStyle = `rgba(134, 239, 172, ${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size * 2, p.size, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (p.type === 'dust') {
+        ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(253, 224, 171, ${alpha * 0.5})`;
+        ctx.fill();
+      } else if (p.type === 'snow') {
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.fill();
+      } else if (p.type === 'ember') {
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        const emberGradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2);
+        emberGradient.addColorStop(0, `rgba(255, 200, 100, ${alpha})`);
+        emberGradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        ctx.fillStyle = emberGradient;
+        ctx.fill();
+      }
+    });
+  }
+
+  private drawProjectileTrails(projectiles: Projectile[]) {
+    if (!this.settings.trailEffect) return;
+
+    const ctx = this.ctx;
+
+    projectiles.forEach((proj) => {
+      const trail = this.projectileTrails.get(proj.id);
+      if (!trail || trail.length < 2) return;
+
+      const config = TOWER_CONFIGS[proj.type];
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      for (let i = 1; i < trail.length; i++) {
+        const prev = trail[i - 1];
+        const curr = trail[i];
+        const alpha = (curr.life / curr.maxLife) * 0.6;
+        const width = (curr.life / curr.maxLife) * 6;
+
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.strokeStyle = config.projectileColor + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        ctx.lineWidth = width;
+        ctx.stroke();
+      }
+
+      if (this.settings.glowEffect && trail.length > 0) {
+        const last = trail[trail.length - 1];
+        const glowGradient = ctx.createRadialGradient(last.x, last.y, 0, last.x, last.y, 20);
+        glowGradient.addColorStop(0, config.projectileColor + '80');
+        glowGradient.addColorStop(1, config.projectileColor + '00');
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 20, 0, Math.PI * 2);
+        ctx.fillStyle = glowGradient;
+        ctx.fill();
+      }
     });
   }
 
   private drawPath(path: Position[]) {
     const ctx = this.ctx;
+    const colors = this.getThemeColors();
 
     ctx.beginPath();
     ctx.moveTo(path[0].x * TILE_SIZE + TILE_SIZE / 2, path[0].y * TILE_SIZE + TILE_SIZE / 2);
@@ -149,17 +515,17 @@ export class GameRenderer {
       ctx.lineTo(path[i].x * TILE_SIZE + TILE_SIZE / 2, path[i].y * TILE_SIZE + TILE_SIZE / 2);
     }
 
-    ctx.strokeStyle = 'rgba(139, 69, 19, 0.6)';
+    ctx.strokeStyle = colors.pathOuter;
     ctx.lineWidth = TILE_SIZE * 0.8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(160, 82, 45, 0.8)';
+    ctx.strokeStyle = colors.pathInner;
     ctx.lineWidth = TILE_SIZE * 0.6;
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(210, 180, 140, 0.4)';
+    ctx.strokeStyle = colors.pathDash;
     ctx.lineWidth = TILE_SIZE * 0.4;
     ctx.setLineDash([5, 10]);
     ctx.stroke();
@@ -188,6 +554,7 @@ export class GameRenderer {
 
   private drawBuildablePositions(towers: Tower[], selectedTowerType: string | null, buildablePositions: Position[]) {
     const ctx = this.ctx;
+    const colors = this.getThemeColors();
 
     buildablePositions.forEach((pos) => {
       const hasTower = towers.some((t) => t.position.x === pos.x && t.position.y === pos.y);
@@ -200,8 +567,8 @@ export class GameRenderer {
         ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
         ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
       } else {
-        ctx.fillStyle = 'rgba(124, 58, 237, 0.1)';
-        ctx.strokeStyle = 'rgba(124, 58, 237, 0.3)';
+        ctx.fillStyle = colors.buildableFill;
+        ctx.strokeStyle = colors.buildableStroke;
       }
 
       ctx.lineWidth = 2;
@@ -798,6 +1165,17 @@ export class GameRenderer {
           ctx.stroke();
           break;
         }
+        case 'death_explosion': {
+          if (progress < 0.1) {
+            this.addDeathParticles(
+              effect.position.x,
+              effect.position.y,
+              effect.enemyColor || '#ff6b35',
+              effect.enemySize || 15
+            );
+          }
+          break;
+        }
       }
     });
   }
@@ -833,11 +1211,87 @@ export class GameRenderer {
 
     this.particles.forEach((p) => {
       const alpha = p.life / p.maxLife;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
-      ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-      ctx.fill();
+      const size = p.size * (p.type === 'smoke' ? (1 + (1 - alpha) * 0.5) : alpha);
+      const colorAlpha = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+
+      ctx.save();
+
+      if (p.rotation !== undefined) {
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.translate(-p.x, -p.y);
+      }
+
+      switch (p.type) {
+        case 'star':
+          this.drawStar(p.x, p.y, size, p.color + colorAlpha);
+          break;
+        case 'spark':
+          this.drawSpark(p.x, p.y, size, p.color + colorAlpha);
+          break;
+        case 'smoke':
+          const smokeGradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
+          smokeGradient.addColorStop(0, p.color + Math.floor(alpha * 128).toString(16).padStart(2, '0'));
+          smokeGradient.addColorStop(1, p.color + '00');
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fillStyle = smokeGradient;
+          ctx.fill();
+          break;
+        default:
+          if (this.settings.glowEffect) {
+            const glowGradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 2);
+            glowGradient.addColorStop(0, p.color + colorAlpha);
+            glowGradient.addColorStop(1, p.color + '00');
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, size * 2, 0, Math.PI * 2);
+            ctx.fillStyle = glowGradient;
+            ctx.fill();
+          }
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fillStyle = p.color + colorAlpha;
+          ctx.fill();
+      }
+
+      ctx.restore();
     });
+  }
+
+  private drawStar(x: number, y: number, size: number, color: string) {
+    const ctx = this.ctx;
+    const spikes = 5;
+    const outerRadius = size;
+    const innerRadius = size * 0.4;
+
+    ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = (i * Math.PI) / spikes - Math.PI / 2;
+      const px = x + Math.cos(angle) * radius;
+      const py = y + Math.sin(angle) * radius;
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, py);
+      }
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  private drawSpark(x: number, y: number, size: number, color: string) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x - size, y);
+    ctx.lineTo(x + size, y);
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x, y + size);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = size * 0.3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
   }
 
   private drawSelectionIndicator(

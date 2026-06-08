@@ -1,8 +1,9 @@
 import { useGameStore } from '@/game/store';
-import { Play, Sparkles, Edit3, Map } from 'lucide-react';
+import { Play, Sparkles, Edit3, Map, Settings } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import LevelSelect from './LevelSelect';
 import { useNavigate } from 'react-router-dom';
+import SettingsPanel from './SettingsPanel';
 
 export default function StartScreen() {
   const { startGame, status, gameMode, setGameMode } = useGameStore();
@@ -27,6 +28,10 @@ export default function StartScreen() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-game-bg via-game-panel to-game-bg overflow-hidden">
+      <div className="absolute top-6 right-6 z-20">
+        <SettingsPanel />
+      </div>
+
       {particles.map((p, i) => (
         <div
           key={i}
