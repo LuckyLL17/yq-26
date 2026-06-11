@@ -1,14 +1,16 @@
 import { useGameStore } from '@/game/store';
 import { Play, Sparkles, Edit3, Map, Settings } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import LevelSelect from './LevelSelect';
 import { useNavigate } from 'react-router-dom';
 import SettingsPanel from './SettingsPanel';
+import { monitor } from '@/lib/monitor';
 
 export default function StartScreen() {
   const { startGame, status, gameMode, setGameMode } = useGameStore();
   const [particles, setParticles] = useState<{ x: number; y: number; delay: number }[]>([]);
   const [showLevelSelect, setShowLevelSelect] = useState(false);
+  const [editorPrefetched, setEditorPrefetched] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,9 +22,19 @@ export default function StartScreen() {
     setParticles(newParticles);
   }, []);
 
+  const prefetchEditor = useCallback(() => {
+    if (editorPrefetched) return;
+    setEditorPrefetched(true);
+    monitor.addBreadcrumb('performance', 'Prefetching Editor page');
+    import('@/pages/Editor').then(() => {
+      monitor.addBreadcrumb('performance', 'Editor page prefetched successfully');
+    });
+  }, [editorPrefetched]);
+
   if (status !== 'idle') return null;
 
   const handleOpenEditor = () => {
+    prefetchEditor();
     navigate('/editor');
   };
 
@@ -132,6 +144,8 @@ export default function StartScreen() {
           </button>
           <button
             onClick={handleOpenEditor}
+            onMouseEnter={prefetchEditor}
+            onFocus={prefetchEditor}
             className="flex items-center gap-2 px-6 py-3 bg-game-panel/80 hover:bg-game-panel border border-game-magic/30 hover:border-game-magic/50 rounded-full transition-all text-white"
           >
             <Edit3 className="w-5 h-5 text-purple-400" />

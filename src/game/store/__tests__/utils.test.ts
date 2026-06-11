@@ -24,12 +24,11 @@ function createEnemy(overrides: Partial<Enemy> = {}): Enemy {
 function createTower(overrides: Partial<Tower> = {}): Tower {
   return {
     id: 'tower_1',
-    type: 'basic',
+    type: 'arrow',
     position: { x: 2, y: 3 },
     level: 1,
-    attackPower: 10,
-    attackRange: 100,
-    attackSpeed: 1,
+    lastAttackTime: 0,
+    angle: 0,
     ...overrides,
   };
 }

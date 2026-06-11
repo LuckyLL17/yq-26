@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import GameCanvas from '@/components/GameCanvas';
 import StatusBar from '@/components/StatusBar';
 import TowerPanel from '@/components/TowerPanel';
@@ -8,13 +9,22 @@ import StartScreen from '@/components/StartScreen';
 import GameOverModal from '@/components/GameOverModal';
 import WaveRewardModal from '@/components/WaveRewardModal';
 import BattleLog from '@/components/BattleLog';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useGameStore } from '@/game/store';
 import { INITIAL_LIVES } from '@/game/config';
+import { monitor } from '@/lib/monitor';
+import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 
 export default function Home() {
   const { status, selectedTowerId, lives } = useGameStore();
   const lowHealthThreshold = INITIAL_LIVES * 0.3;
   const isLowHealth = lives <= lowHealthThreshold && status === 'playing';
+
+  usePerformanceMonitor('HomePage');
+
+  useEffect(() => {
+    monitor.trackEvent('page_view', { page: 'home', status });
+  }, [status]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-game-bg via-game-panel to-game-bg relative">
@@ -81,7 +91,9 @@ export default function Home() {
             </div>
 
             <div className="flex-1 order-1 lg:order-2 flex justify-center">
-              <GameCanvas />
+              <ErrorBoundary componentName="GameCanvas">
+                <GameCanvas />
+              </ErrorBoundary>
             </div>
 
             <div className="lg:w-64 flex-shrink-0 order-3 space-y-4">
